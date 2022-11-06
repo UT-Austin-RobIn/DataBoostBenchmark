@@ -1,0 +1,18 @@
+certifi @ file:///croot/certifi_1665076670883/work/certifi
+cffi==1.15.1
+cloudpickle==2.2.0
+Cython==0.29.32
+fasteners==0.18
+glfw==2.5.5
+gym==0.26.2
+gym-notices==0.0.8
+imageio==2.22.3
+importlib-metadata==5.0.0
+metaworld @ git+https://github.com/rlworkgroup/metaworld.git@18118a28c06893da0f363786696cc792457b062b
+mujoco-py==2.1.2.14
+numpy==1.21.6
+Pillow==9.3.0
+pycparser==2.21
+scipy==1.7.3
+typing_extensions==4.4.0
+zipp==3.10.0
