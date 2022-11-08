@@ -1,8 +1,5 @@
-from databoost.base import DataConfig
-
-
 benchmark_list = [
     "metaworld"
 ]
 
-__all__ = [DataConfig]
+__all__ = [benchmark_list]
