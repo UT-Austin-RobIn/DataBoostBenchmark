@@ -1,9 +1,10 @@
+from dataclasses import dataclass
 import os
 from typing import Dict
 
 import gym
 
-from dataclasses import dataclass
+from databoost.utils.data import read_h5
 
 
 @dataclass
@@ -31,24 +32,18 @@ class DataBoostBenchmarkBase:
         raise NotImplementedError
 
 
-class DataBoostEnv(gym.Env):
+class DataBoostEnvWrapper(gym.Wrapper):
 
     def __init__(self,
+                 env,
                  prior_dataset_url: str,
-                 seed_dataset_url: str,
-                 task: Task = None,
-                 **kwargs):
-        super().__init__(**kwargs)
+                 seed_dataset_url: str):
+        super().__init__(env)
         self.prior_dataset_url = prior_dataset_url
         self.seed_dataset_url = seed_dataset_url
-        self.task = task
-
-    def set_task(self, task: Task):
-        pass
 
     def get_seed_dataset(self, size: int):
-        assert self.task is not None
-        pass
+        return read_h5(self.seed_dataset_url)
 
     def get_prior_dataset(self, size: int):
         pass

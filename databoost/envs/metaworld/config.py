@@ -1,11 +1,6 @@
 import os
 
-from metaworld.envs.mujoco.sawyer_xyz.v2 import (
-    SawyerDoorEnvV2,
-    SawyerDoorCloseEnvV2,
-    SawyerDoorLockEnvV2,
-    SawyerDoorUnlockEnvV2,
-)
+from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE as ALL_V2_ENVS
 
 from metaworld.policies import (
     SawyerDoorOpenV2Policy,
@@ -27,19 +22,19 @@ num_seed_demos_per_task = 10
 
 seed_tasks = {
     "door-open": {
-        "env": SawyerDoorEnvV2,
+        "env": ALL_V2_ENVS['door-open-v2-goal-observable'],
         "expert_policy": SawyerDoorOpenV2Policy,
     },
     "door-close": {
-        "env": SawyerDoorCloseEnvV2,
+        "env": ALL_V2_ENVS['door-close-v2-goal-observable'],
         "expert_policy": SawyerDoorCloseV2Policy,
     },
     "door-lock": {
-        "env": SawyerDoorLockEnvV2,
+        "env": ALL_V2_ENVS['door-lock-v2-goal-observable'],
         "expert_policy": SawyerDoorLockV2Policy,
     },
     "door-unlock": {
-        "env": SawyerDoorUnlockEnvV2,
+        "env": ALL_V2_ENVS['door-unlock-v2-goal-observable'],
         "expert_policy": SawyerDoorUnlockV2Policy,
     }
 }

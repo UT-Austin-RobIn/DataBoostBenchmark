@@ -1,5 +1,3 @@
-benchmark_list = [
-    "metaworld"
-]
+from databoost.envs import metaworld
 
-__all__ = [benchmark_list]
+__all__ = [metaworld]

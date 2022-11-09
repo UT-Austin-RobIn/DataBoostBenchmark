@@ -1,7 +1,7 @@
 import functools
 import os
 import pickle
-from typing import Tuple
+from typing import Dict, Tuple
 
 import cv2
 import numpy as np
@@ -58,8 +58,22 @@ def trajectory_generator(env: MujocoEnv,
         yield ob, act, rew, done, info, im
 
 
-def add_to_traj(traj, ob, act, rew, done, info, im):
-    '''
+def add_to_traj(traj: AttrDict,
+                ob: np.ndarray,
+                act: np.ndarray,
+                rew: float,
+                done: bool,
+                info: Dict,
+                im: np.ndarray):
+    '''helper function to append a step's results to a trajectory dictionary
+    Args:
+        traj [AttrDict]: dictionary with keys {obs, acts, rews, dones, infos, ims}
+        ob [np.ndarray]: observation; 39 dimensional array
+        act [np.ndarray]: action; 4 dimensional array
+        rew [float]: reward; float
+        done [bool]: done flag
+        info [Dict]: task-specific info
+        im [np.ndarray]: rendered image after the step
     '''
     traj.obs.append(ob)
     traj.acts.append(act)
@@ -69,13 +83,16 @@ def add_to_traj(traj, ob, act, rew, done, info, im):
     traj.ims.append(im)
 
 
-def traj_to_numpy(traj):
+def traj_to_numpy(traj: AttrDict):
+    '''convert trajectories attributes into numpy arrays
+    Args:
+        traj [AttrDict]: dictionary with keys {obs, acts, rews, dones, infos, ims}
+    Returns:
+        traj_numpy [AttrDict]: trajectory dict with attributes as numpy arrays
+    '''
     traj_numpy = AttrDict()
     for attr in traj:
-        try:
-            traj_numpy[attr] = np.concatenate(traj[attr])
-        except ValueError:
-            traj_numpy[attr] = np.array(traj[attr])
+        traj_numpy[attr] = np.array(traj[attr])
     return traj_numpy
 
 
@@ -90,8 +107,10 @@ if __name__ == "__main__":
         # instantiate expert policy
         policy = task_config.expert_policy()
         # generate specified number of successful demos per seed task
-        num_success_demos = 0
-        while num_success_demos < config.num_seed_demos_per_task:
+        seed_task_dir = os.path.join(config.seed_dataset_dir, task_name)
+        os.makedirs(seed_task_dir, exist_ok=True)
+        num_success, num_tries = 0, 0
+        while num_success < config.num_seed_demos_per_task:
             traj = AttrDict()
             # initialize empty arrays
             for attr in ["obs", "acts", "rews", "dones", "infos", "ims"]:
@@ -99,11 +118,12 @@ if __name__ == "__main__":
             # generate trajectories using expert policy
             for ob, act, rew, done, info, im in trajectory_generator(env, policy):
                 add_to_traj(traj, ob, act, rew, done, info, im)
-                if done:
-                    if info['success']:
-                        num_success_demos += 1
-                        traj = traj_to_numpy(traj)
-                        filename = f"{task_name}_{num_success_demos}.h5"
-                        write_h5(traj, os.path.join(
-                            config.seed_dataset_dir, task_name, filename))
-                        break
+                # done is always false, as per Meta-world's infinite-horizon MDP paradigm
+                if info['success']:
+                    num_success += 1
+                    traj = traj_to_numpy(traj)
+                    filename = f"{task_name}_{num_success}.h5"
+                    write_h5(traj, os.path.join(seed_task_dir, filename))
+                    break
+            num_tries += 1
+            print(f"generating {task_name} demos: {num_success}/{num_tries}")
