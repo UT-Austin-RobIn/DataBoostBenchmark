@@ -1,8 +1,9 @@
 import json
 import os
-from typing import Any, List, Dict
+from typing import Any, List, Dict, Tuple
 
 import h5py
+import numpy as np
 
 from databoost.utils.general import AttrDict
 
@@ -67,3 +68,17 @@ def write_json(obj: Any, dest_path: str):
     '''
     with open(dest_path, "w") as F:
         json.dump(obj, F)
+
+
+def concatenate_traj_data(trajs: Tuple[AttrDict]):
+    traj_concat = AttrDict()
+    for traj in trajs:
+        traj_len = len(traj.observations)
+        for attr, val in traj.items():
+            assert isinstance(traj[attr], np.ndarray)
+            assert len(val) == traj_len
+            if attr not in traj_concat:
+                traj_concat[attr] = val
+            else:
+                traj_concat[attr] = np.concatenate((traj_concat[attr], val), axis=0)
+    return traj_concat

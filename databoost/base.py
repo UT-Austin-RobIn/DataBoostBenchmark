@@ -4,7 +4,7 @@ from typing import Dict
 
 import gym
 
-from databoost.utils.data import read_h5
+from databoost.utils.data import find_h5, read_h5, concatenate_traj_data
 
 
 @dataclass
@@ -42,8 +42,13 @@ class DataBoostEnvWrapper(gym.Wrapper):
         self.prior_dataset_url = prior_dataset_url
         self.seed_dataset_url = seed_dataset_url
 
-    def get_seed_dataset(self, size: int):
-        return read_h5(self.seed_dataset_url)
+    def get_seed_dataset(self, n_demos: int):
+        seed_dataset_files = find_h5(self.seed_dataset_url)
+        assert len(seed_dataset_files) >= n_demos, \
+            f"given n_demos too large. Max is {len(seed_dataset_files)}"
+        trajs = [read_h5(seed_dataset_files[i]) for i in range(n_demos)]
+        trajs = concatenate_traj_data(trajs)
+        return trajs
 
-    def get_prior_dataset(self, size: int):
+    def get_prior_dataset(self, n_demos: int):
         pass

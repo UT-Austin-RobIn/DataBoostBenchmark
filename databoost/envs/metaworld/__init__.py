@@ -1,14 +1,20 @@
 import metaworld
-from metaworld.envs import ALL_V2_ENVIRONMENTS_GOAL_OBSERVABLE as ALL_V2_ENVS
 
 from databoost.base import DataBoostEnvWrapper
-import databoost.envs.metaworld.config as const
+import databoost.envs.metaworld.config as cfg
 
 
-door_open_env = DataBoostEnvWrapper(
-    ALL_V2_ENVS['door-open-v2-goal-observable'](),
-    seed_dataset_url="databoost/envs/metaworld/data/seed/door-open/door-open_1.h5",
-    prior_dataset_url=""
-)
+tasks_list = list(cfg.tasks.keys())
 
-__all__ = [door_open_env]
+
+def get_env(task_name: str):
+    task_cfg = cfg.tasks.get(task_name)
+    assert task_cfg is not None, f"{task_name} is not a valid task name."
+    return DataBoostEnvWrapper(
+        task_cfg.env(),
+        seed_dataset_url=task_cfg.seed_dataset,
+        prior_dataset_url=""
+    )
+
+
+__all__ = [tasks_list, get_env]

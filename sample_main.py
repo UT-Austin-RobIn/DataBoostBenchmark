@@ -38,8 +38,8 @@ if __name__ == "__main__":
         observations: N x seq_len x obs_dim array of observations,
         actions: N x seq_len x action_dim array of actions,
         rewards: N x seq_len float array of rewards,
-        done: N x seq_len boolean array of termination flags,
-        info: N x seq_len optional task-specific information
+        dones: N x seq_len boolean array of termination flags,
+        infos: N x seq_len optional task-specific information
     }
     '''
     seed_dataset = benchmark.get_seed_dataset(task=chosen_task, size=10)
