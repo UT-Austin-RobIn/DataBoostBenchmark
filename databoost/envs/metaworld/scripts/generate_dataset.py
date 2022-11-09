@@ -1,7 +1,7 @@
 import functools
 import os
 import pickle
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -109,8 +109,14 @@ def traj_to_numpy(traj: AttrDict):
     return traj_numpy
 
 
-if __name__ == "__main__":
-    for task_name in cfg.seed_tasks_list:
+def generate_dataset(
+    tasks_list: List[str],
+    dest_dir: str,
+    n_demos_per_task: int,
+    act_noise_pct: float,
+    resolution: Tuple[int],
+    mask_reward: bool):
+    for task_name in tasks_list:
         task_config = cfg.tasks[task_name]
         env = task_config.env()
         # Set necessary env attributes
@@ -118,10 +124,10 @@ if __name__ == "__main__":
         # instantiate expert policy
         policy = task_config.expert_policy()
         # generate specified number of successful demos per seed task
-        seed_task_dir = os.path.join(cfg.seed_dataset_dir, task_name)
-        os.makedirs(seed_task_dir, exist_ok=True)
+        task_dir = os.path.join(dest_dir, task_name)
+        os.makedirs(task_dir, exist_ok=True)
         num_success, num_tries = 0, 0
-        while num_success < cfg.num_seed_demos_per_task:
+        while num_success < n_demos_per_task:
             traj = AttrDict()
             # initialize empty arrays
             for attr in TRAJ_KEYS:
@@ -130,14 +136,15 @@ if __name__ == "__main__":
             for ob, act, rew, done, info, im in trajectory_generator(
                 env,
                 policy,
-                act_noise_pct=cfg.seed_action_noise_pct,
-                res=cfg.seed_imgs_res):
+                act_noise_pct=act_noise_pct,
+                res=resolution):
                     info.update({
                         "fps": env.metadata['video.frames_per_second'],
-                        "resolution": cfg.seed_imgs_res,
-                        "act_noise_pct": cfg.seed_action_noise_pct
+                        "resolution": resolution,
+                        "act_noise_pct": act_noise_pct
                     })
-                    done = True if info['success'] else False
+                    if info['success']: done = True
+                    if mask_reward: rew = 0.0
                     add_to_traj(traj, ob, act, rew, done, info, im)
                     # done is always false, as per Meta-world's
                     # infinite-horizon MDP paradigm
@@ -145,7 +152,29 @@ if __name__ == "__main__":
                         num_success += 1
                         traj = traj_to_numpy(traj)
                         filename = f"{task_name}_{num_success}.h5"
-                        write_h5(traj, os.path.join(seed_task_dir, filename))
+                        write_h5(traj, os.path.join(task_dir, filename))
                         break
             num_tries += 1
             print(f"generating {task_name} demos: {num_success}/{num_tries}")
+
+
+if __name__ == "__main__":
+    '''Generate seed datasets'''
+    generate_dataset(
+        tasks_list=cfg.seed_tasks_list,
+        dest_dir=cfg.seed_dataset_dir,
+        n_demos_per_task=cfg.num_seed_demos_per_task,
+        act_noise_pct=cfg.seed_action_noise_pct,
+        resolution=cfg.seed_imgs_res,
+        mask_reward=False
+    )
+
+    '''Generate prior dataset'''
+    generate_dataset(
+        tasks_list=cfg.prior_tasks_list,
+        dest_dir=cfg.prior_dataset_dir,
+        n_demos_per_task=cfg.num_prior_demos_per_task,
+        act_noise_pct=cfg.prior_action_noise_pct,
+        resolution=cfg.prior_imgs_res,
+        mask_reward=True
+    )

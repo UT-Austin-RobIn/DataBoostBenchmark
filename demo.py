@@ -9,26 +9,28 @@ def main():
     # list out benchmarks
     print(databoost.benchmarks_list)
     # choose benchmark
-    benchmark = databoost.benchmark["metaworld"]
+    benchmark = databoost.benchmark["metaworld"]()
     # list out benchmark tasks
     print(benchmark.tasks_list)
     # choose task
     task = random.choice(benchmark.tasks_list)
     # instantiate corresponding environment
     env = benchmark.get_env(task)
-    # get seed dataset (n_demos <= len(seed_dataset))
+    # get seed dataset (n_demos <= total seed demos)
     seed_dataset = env.get_seed_dataset(n_demos=5)
     for attr, val in seed_dataset.items():
         print(f"{attr} [{type(val)}]: {val.shape}")
     print(f"num_dones: {sum(seed_dataset.dones)}")
-    # # get prior dataset
-    # prior_dataset = env.get_prior_dataset(n_demos=200)
-    # for attr, val in prior_dataset.items():
-    #     print(f"{attr}: {val.shape}")
+    # get prior dataset (n_demos <= total prior demos)
+    prior_dataset = env.get_prior_dataset(n_demos=50)
+    for attr, val in prior_dataset.items():
+        print(f"{attr} [{type(val)}]: {val.shape}")
+    print(f"num_dones: {sum(prior_dataset.dones)}")
+    print(f"sum of all rewards: {prior_dataset.rewards.sum()}")
     # policy and video writer for demo purposes
-    policy = databoost.metaworld.config.tasks[task].expert_policy()
+    policy = databoost.envs.metaworld.config.tasks[task].expert_policy()
     writer = cv2.VideoWriter(
-        f'{task_name}_demo.avi',
+        f'{task}_demo.avi',
         cv2.VideoWriter_fourcc('M','J','P','G'),
         env.metadata['video.frames_per_second'],
         (640, 480)

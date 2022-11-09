@@ -1,8 +1,8 @@
-from databoost.envs import metaworld
+from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 
 
 benchmark = {
-    "metaworld": metaworld,
+    "metaworld": DataBoostBenchmarkMetaworld,
 }
 
 benchmarks_list = list(benchmark.keys())

@@ -41,6 +41,19 @@ tasks = {
 }
 
 
+'''Prior tasks configs'''
+prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_action_noise_pct = 0.1
+prior_imgs_res = (640, 480)
+num_prior_demos_per_task = 20
+prior_tasks_list = [
+    "door-open",
+    "door-close",
+    "door-lock",
+    "door-unlock"
+]
+
+
 '''Seed tasks configs'''
 seed_dataset_dir = os.path.join(env_root, "data/seed")
 seed_action_noise_pct = 0.1
