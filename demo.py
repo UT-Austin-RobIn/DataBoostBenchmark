@@ -22,7 +22,7 @@ def main():
         print(f"{attr} [{type(val)}]: {val.shape}")
     print(f"num_dones: {sum(seed_dataset.dones)}")
     # get prior dataset (n_demos <= total prior demos)
-    prior_dataset = env.get_prior_dataset(n_demos=50)
+    prior_dataset = env.get_prior_dataset(n_demos=30)
     for attr, val in prior_dataset.items():
         print(f"{attr} [{type(val)}]: {val.shape}")
     print(f"num_dones: {sum(prior_dataset.dones)}")
