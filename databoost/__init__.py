@@ -1,11 +1,14 @@
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 
 
-benchmark = {
+benchmarks = {
     "metaworld": DataBoostBenchmarkMetaworld,
 }
 
-benchmarks_list = list(benchmark.keys())
+benchmarks_list = list(benchmarks.keys())
 
+def get_benchmark(benchmark_name: str):
+    assert benchmark_name in benchmarks_list
+    return benchmarks[benchmark_name]()
 
-__all__ = [benchmark, benchmarks_list]
+__all__ = [get_benchmark, benchmarks_list]

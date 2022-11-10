@@ -9,7 +9,7 @@ def main():
     # list out benchmarks
     print(f"benchmarks: {databoost.benchmarks_list}")
     # choose benchmark
-    benchmark = databoost.benchmark["metaworld"]()
+    benchmark = databoost.get_benchmark("metaworld")
     # list out benchmark tasks
     print(f"tasks: {benchmark.tasks_list}")
     # choose task
