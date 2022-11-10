@@ -7,11 +7,11 @@ import databoost
 
 def main():
     # list out benchmarks
-    print(databoost.benchmarks_list)
+    print(f"benchmarks: {databoost.benchmarks_list}")
     # choose benchmark
     benchmark = databoost.benchmark["metaworld"]()
     # list out benchmark tasks
-    print(benchmark.tasks_list)
+    print(f"tasks: {benchmark.tasks_list}")
     # choose task
     task = random.choice(benchmark.tasks_list)
     # instantiate corresponding environment
@@ -41,6 +41,7 @@ def main():
         act = policy.get_action(ob)
         ob, rew, done, info = env.step(act)
         print(f"{step_num}: {rew}")
+        # should probably standardize render API
         im = env.render(offscreen=True, camera_name="behindGripper",
                         resolution=(640, 480))[:, :, ::-1]
         im = cv2.rotate(im, cv2.ROTATE_180)
