@@ -1,8 +1,11 @@
+from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
+
 
 
 benchmarks = {
     "metaworld": DataBoostBenchmarkMetaworld,
+    "antmaze": DataBoostBenchmarkAntMaze
 }
 
 benchmarks_list = list(benchmarks.keys())

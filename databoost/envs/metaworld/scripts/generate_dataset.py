@@ -115,7 +115,22 @@ def generate_dataset(
     n_demos_per_task: int,
     act_noise_pct: float,
     resolution: Tuple[int],
+    camera: str,
     mask_reward: bool):
+    '''generates a metaworld dataset given a list of tasks and other configs.
+    
+    Args:
+        tasks_list [List[str]]: list of metaworld task names for which to generate data;
+                                full list is DataBoostBenchmarkMetaworld.tasks_list
+        dest_dir [str]: path to directory to which the dataset is to be written
+        n_demos_per_task [int]: number of demos to generate per task
+        act_noise_pct [float]: noise to add to the action as a percentage
+                               of the total action range
+        resolution [Tuple[int]]: resolution of rendered images; (width, height)
+        camera [str]: Meta-world camera type (default: "behindGripper"); one of
+                      ['corner', 'topview', 'behindGripper', 'gripperPOV']
+        mask_reward [bool]: if true, all rewards are set to zero (for prior dataset)
+    '''
     for task_name in tasks_list:
         task_config = cfg.tasks[task_name]
         env = task_config.env()
@@ -137,7 +152,8 @@ def generate_dataset(
                 env,
                 policy,
                 act_noise_pct=act_noise_pct,
-                res=resolution):
+                res=resolution,
+                camera=camera):
                     info.update({
                         "fps": env.metadata['video.frames_per_second'],
                         "resolution": resolution,
@@ -166,6 +182,7 @@ if __name__ == "__main__":
         n_demos_per_task=cfg.num_seed_demos_per_task,
         act_noise_pct=cfg.seed_action_noise_pct,
         resolution=cfg.seed_imgs_res,
+        camera=cfg.seed_camera,
         mask_reward=False
     )
 
@@ -176,5 +193,6 @@ if __name__ == "__main__":
         n_demos_per_task=cfg.num_prior_demos_per_task,
         act_noise_pct=cfg.prior_action_noise_pct,
         resolution=cfg.prior_imgs_res,
+        camera=cfg.prior_camera,
         mask_reward=True
     )
