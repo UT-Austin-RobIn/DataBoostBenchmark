@@ -32,14 +32,14 @@ def visualize_h5(path: str):
         dest_path = os.path.join(dest_root, dest_filename)
         # load visualization metadata
         traj_data = read_h5(path)
-        fps = 80
-        res = (224, 224)
+        fps = traj_data.infos.fps[0]
+        resolution = traj_data.infos.resolution[0]
         # write images of dataset to a video and save
         writer = cv2.VideoWriter(
             dest_path,
             cv2.VideoWriter_fourcc('M','J','P','G'),
             fps,
-            res
+            resolution
         )
         for im in traj_data.imgs:
             writer.write(im)

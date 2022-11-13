@@ -32,6 +32,7 @@ common_expert_policy_kwargs = {
 }
 tasks = {
     "medium-goal-top-right": AttrDict({
+        "task_name": "medium-goal-top-right",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -43,6 +44,7 @@ tasks = {
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
     "medium-goal-bottom-right": AttrDict({
+        "task_name": "medium-goal-bottom-right",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -54,6 +56,7 @@ tasks = {
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
     "medium-goal-bottom-left": AttrDict({
+        "task_name": "medium-goal-bottom-left",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -65,6 +68,7 @@ tasks = {
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
     "large-goal-top-right": AttrDict({
+        "task_name": "large-goal-top-right",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -76,6 +80,7 @@ tasks = {
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
     "large-goal-bottom-right": AttrDict({
+        "task_name": "large-goal-bottom-right",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -87,6 +92,7 @@ tasks = {
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
     "large-goal-bottom-left": AttrDict({
+        "task_name": "large-goal-bottom-left",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
@@ -106,7 +112,12 @@ prior_action_noise_pct = 0.1
 prior_imgs_res = (224, 224)
 num_prior_demos_per_task = 20
 prior_tasks_list = [
-    "large-goal-bottom-right"
+    "medium-goal-top-right",
+    "medium-goal-bottom-right",
+    "medium-goal-bottom-left",
+    "large-goal-top-right",
+    "large-goal-bottom-right",
+    "large-goal-bottom-left"
 ]
 
 
@@ -117,8 +128,5 @@ seed_imgs_res = (224, 224)
 num_seed_demos_per_task = 10
 seed_camera = "corner"
 seed_tasks_list = [
-    "door-open",
-    "door-close",
-    "door-lock",
-    "door-unlock"
+    "large-goal-bottom-right"
 ]

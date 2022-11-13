@@ -127,13 +127,13 @@ class DatasetGeneratorBase:
         env: gym.Env,
         policy: DatasetGenerationPolicyBase,
         task_config,
-        render: bool = True):
+        do_render: bool = True):
         '''Generates MujocoEnv trajectories given a policy.
         Args:
             env [MujocoEnv]: Meta-world's MujocoEnv
             policy [Policy]: policy that returns an action given an
                                 observation, with a get_action call
-            render [bool]: if true, render images and store it as part of the
+            do_render [bool]: if true, render images and store it as part of the
                            h5 dataset (render_img function must be overloaded)
         Returns:
             generator of tuple (
@@ -153,7 +153,7 @@ class DatasetGeneratorBase:
             ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
             success = self.is_success(env, ob, rew, done, info)
             im = None
-            if render:
+            if do_render:
                 im = self.render_img(env)
             yield ob, act, rew, done, info, im, success
 
@@ -214,7 +214,7 @@ class DatasetGeneratorBase:
         dest_dir: str,
         n_demos_per_task: int,
         mask_reward: bool,
-        render: bool = True):
+        do_render: bool = True):
         '''generates a dataset given a list of tasks and other configs.
 
         Args:
@@ -235,7 +235,7 @@ class DatasetGeneratorBase:
             while num_success < n_demos_per_task:
                 traj = self.init_traj()
                 # generate trajectories using expert policy
-                for ob, act, rew, done, info, im, success in self.trajectory_generator(env, policy, task_config, render):
+                for ob, act, rew, done, info, im, success in self.trajectory_generator(env, policy, task_config, do_render):
                     if mask_reward: rew = 0.0
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
                     if success:

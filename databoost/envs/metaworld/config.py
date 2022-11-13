@@ -19,21 +19,25 @@ env_root = "/home/jullian-yapeter/code/DataBoostBenchmark/databoost/envs/metawor
 '''Tasks configs'''
 tasks = {
     "door-open": AttrDict({
+        "task_name": "door-open",
         "env": ALL_V2_ENVS['door-open-v2-goal-observable'],
         "seed_dataset": "databoost/envs/metaworld/data/seed/door-open",
         "expert_policy": SawyerDoorOpenV2Policy,
     }),
     "door-close": AttrDict({
+        "task_name": "door-close",
         "env": ALL_V2_ENVS['door-close-v2-goal-observable'],
         "seed_dataset": "databoost/envs/metaworld/data/seed/door-close",
         "expert_policy": SawyerDoorCloseV2Policy,
     }),
     "door-lock": AttrDict({
+        "task_name": "door-lock",
         "env": ALL_V2_ENVS['door-lock-v2-goal-observable'],
         "seed_dataset": "databoost/envs/metaworld/data/seed/door-lock",
         "expert_policy": SawyerDoorLockV2Policy,
     }),
     "door-unlock": AttrDict({
+        "task_name": "door-unlock",
         "env": ALL_V2_ENVS['door-unlock-v2-goal-observable'],
         "seed_dataset": "databoost/envs/metaworld/data/seed/door-unlock",
         "expert_policy": SawyerDoorUnlockV2Policy,
@@ -50,7 +54,7 @@ seed_tasks_list = [
 ]
 seed_dataset_dir = os.path.join(env_root, "data/seed")
 seed_n_demos = 10
-seed_render = True
+seed_do_render = True
 seed_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
     "resolution": (224, 224),
@@ -67,7 +71,7 @@ prior_tasks_list = [
 ]
 prior_dataset_dir = os.path.join(env_root, "data/prior")
 prior_n_demos = 20
-prior_render = True
+prior_do_render = True
 prior_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
     "resolution": (224, 224),

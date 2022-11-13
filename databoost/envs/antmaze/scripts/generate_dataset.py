@@ -1,173 +1,89 @@
+import copy
+
+import cv2
 import numpy as np
-import pickle
-import gzip
-import h5py
-import argparse
-from d4rl.locomotion import maze_env, ant, swimmer
-from d4rl.locomotion.wrappers import NormalizedBoxEnv
-import torch
-from PIL import Image
-import os
+
+from databoost.base import DatasetGenerationPolicyBase, DatasetGeneratorBase
+import databoost.envs.antmaze.config as cfg
 
 
-def reset_data():
-    return {'observations': [],
-            'actions': [],
-            'dones': [],
-            'rewards': [],
-            'imgs': [],
-            'infos/terminals': [],
-            'infos/timeouts': [],
-            'infos/goal': [],
-            'infos/qpos': [],
-            'infos/qvel': [],
-            }
+class DatasetGenerationPolicyAntMaze(DatasetGenerationPolicyBase):
+    def __init__(self, antmaze_policy, **datagen_kwargs):
+        super().__init__(**datagen_kwargs)
+        self.policy = metaworld_policy
 
-def append_data(data, s, a, r, tgt, done, timeout, env_data):
-    data['observations'].append(s)
-    data['actions'].append(a)
-    data['rewards'].append(r)
-    data['dones'].append(done or timeout)
-    data['infos/terminals'].append(done)
-    data['infos/timeouts'].append(timeout)
-    data['infos/goal'].append(tgt)
-    data['infos/qpos'].append(env_data.qpos.ravel().copy())
-    data['infos/qvel'].append(env_data.qvel.ravel().copy())
+    def get_action(self, env, ob: np.ndarray):
+        act_noise_pct = self.datagen_kwargs.get("act_noise_pct")
+        if act_noise_pct is None:
+            act_noise_pct = np.zeros_like(env.action_space.sample())
+        act = self.policy.get_action(ob)
+        act = np.random.normal(
+            act, act_noise_pct * self.datagen_kwargs.act_space_ptp)
+        return act
 
-def npify(data):
-    for k in data:
-        if k in ['dones', 'terminals', 'timeouts']:
-            dtype = np.bool_
-        else:
-            dtype = np.float32
 
-        data[k] = np.array(data[k], dtype=dtype)
+class DatasetGeneratorMetaworld(DatasetGeneratorBase):
+    def init_env(self, task_config):
+        return initialize_env(task_config.env())
 
-def load_policy(policy_class, policy_kwargs, policy_state_dict_path):
-    model.load_state_dict(torch.load(PATH))
-    policy = policy_class(policy_kwargs)
-    policy.load_state_dict(torch.load(policy_state_dict_path))
-    policy.eval()
-    policy.to('cpu')
-    print("Policy loaded")
-    return policy
+    def init_policy(self, env, task_config):
+        act_space = env.action_space
+        act_space_ptp = act_space.high - act_space.low
+        datagen_kwargs = copy.deepcopy(self.dataset_kwargs)
+        datagen_kwargs.update({"act_space_ptp": act_space_ptp})
+        return DatasetGenerationPolicyMetaworld(
+            task_config.expert_policy,
+            **datagen_kwargs
+        )
 
-def save_video(save_dir, file_name, frames, episode_id=0):
-    filename = os.path.join(save_dir, file_name+ '_episode_{}'.format(episode_id))
-    if not os.path.exists(filename):
-        os.makedirs(filename)
-    num_frames = frames.shape[0]
-    for i in range(num_frames):
-        img = Image.fromarray(np.flipud(frames[i]), 'RGB')
-        img.save(os.path.join(filename, 'frame_{}.png'.format(i)))
+    def get_max_traj_len(self, env, task_config):
+        return task_config.env.max_path_length
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--noisy', action='store_true', help='Noisy actions')
-    parser.add_argument('--maze', type=str, default='umaze', help='Maze type. umaze, medium, or large')
-    parser.add_argument('--num_samples', type=int, default=int(1e6), help='Num samples to collect')
-    parser.add_argument('--env', type=str, default='Ant', help='Environment type')
-    parser.add_argument('--policy_file', type=str, default='policy_file', help='file_name')
-    parser.add_argument('--max_episode_steps', default=1000, type=int)
-    parser.add_argument('--video', action='store_true')
-    parser.add_argument('--multi_start', action='store_true')
-    parser.add_argument('--multigoal', action='store_true')
-    args = parser.parse_args()
+    def render_img(self, env):
+        camera = self.dataset_kwargs.camera
+        im = env.render(offscreen=True,
+                        camera_name=camera,
+                        resolution=self.dataset_kwargs.resolution)[:, :, ::-1]
+        if camera == "behindGripper":  # this view requires a 180 rotation
+            im = cv2.rotate(im, cv2.ROTATE_180)
+        return im
 
-    if args.maze == 'umaze':
-        maze = maze_env.U_MAZE
-    elif args.maze == 'medium':
-        maze = maze_env.BIG_MAZE
-    elif args.maze == 'large':
-        maze = maze_env.HARDEST_MAZE
-    else:
-        raise NotImplementedError
-    
-    if args.env == 'Ant':
-        env = NormalizedBoxEnv(ant.AntMazeEnv(maze_map=maze, maze_size_scaling=4.0, non_zero_reset=args.multi_start))
-    elif args.env == 'Swimmer':
-        env = NormalizedBoxEnv(swimmer.SwimmerMazeEnv(mmaze_map=maze, maze_size_scaling=4.0, non_zero_reset=args.multi_start))
-    else:
-        raise NotImplementedError
-    
-    env.set_target()
-    s = env.reset()
-    act = env.action_space.sample()
-    done = False
+    def is_success(self, env, ob, rew, done, info):
+        return info["success"]
 
-    # Load the policy
-    policy = load_policy(args.policy_file)
+    def post_process_step(self, env, ob, rew, done, info):
+        info.update({
+            "fps": env.metadata['video.frames_per_second'],
+            "resolution": self.dataset_kwargs.resolution,
+            "act_noise_pct": self.dataset_kwargs.act_noise_pct
+        })
+        if info['success']: done = True
+        return ob, rew, done, info
 
-    # Define goal reaching policy fn
-    def _goal_reaching_policy_fn(obs, goal):
-        goal_x, goal_y = goal
-        obs_new = obs[2:-2]
-        goal_tuple = np.array([goal_x, goal_y])
 
-        # normalize the norm of the relative goals to in-distribution values
-        goal_tuple = goal_tuple / np.linalg.norm(goal_tuple) * 10.0
-
-        new_obs = np.concatenate([obs_new, goal_tuple], -1)
-        return policy.get_action(new_obs)[0], (goal_tuple[0] + obs[0], goal_tuple[1] + obs[1])      
-
-    data = reset_data()
-
-    # create waypoint generating policy integrated with high level controller
-    data_collection_policy = env.create_navigation_policy(
-        _goal_reaching_policy_fn,
+if __name__ == "__main__":
+    '''generate seed dataset'''
+    seed_dataset_generator = DatasetGeneratorMetaworld(**cfg.seed_dataset_kwargs)
+    seed_dataset_generator.generate_dataset(
+        tasks = {
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.seed_tasks_list
+        },
+        dest_dir = cfg.seed_dataset_dir,
+        n_demos_per_task = cfg.seed_n_demos,
+        render = cfg.seed_render,
+        mask_reward = False
     )
 
-    if args.video:
-        frames = []
-    
-    ts = 0
-    num_episodes = 0
-    for _ in range(args.num_samples):
-        act, waypoint_goal = data_collection_policy(s)
-
-        if args.noisy:
-            act = act + np.random.randn(*act.shape)*0.2
-            act = np.clip(act, -1.0, 1.0)
-
-        ns, r, done, info = env.step(act)
-        timeout = False
-        if ts >= args.max_episode_steps:
-            timeout = True
-            #done = True
-        
-        append_data(data, s[:-2], act, r, env.target_goal, done, timeout, env.physics.data)
-
-        if len(data['observations']) % 10000 == 0:
-            print(len(data['observations']))
-
-        ts += 1
-
-        if done or timeout:
-            done = False
-            ts = 0
-            s = env.reset()
-            env.set_target_goal()
-            if args.video:
-                frames = np.array(frames)
-                save_video('./videos/', args.env + '_navigation', frames, num_episodes)
-            
-            num_episodes += 1
-            frames = []
-        else:
-            s = ns
-
-        if args.video:
-            curr_frame = env.physics.render(width=500, height=500, depth=False)
-            frames.append(curr_frame)
-    
-    if args.noisy:
-        fname = args.env + '_maze_%s_noisy_multistart_%s_multigoal_%s.hdf5' % (args.maze, str(args.multi_start), str(args.multigoal))
-    else:
-        fname = args.env + 'maze_%s_multistart_%s_multigoal_%s.hdf5' % (args.maze, str(args.multi_start), str(args.multigoal))
-    dataset = h5py.File(fname, 'w')
-    npify(data)
-    for k in data:
-        dataset.create_dataset(k, data=data[k], compression='gzip')
-
-if __name__ == '__main__':
-    main()
+    '''generate prior dataset'''
+    prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
+    prior_dataset_generator.generate_dataset(
+        tasks = {
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.prior_tasks_list
+        },
+        dest_dir = cfg.prior_dataset_dir,
+        n_demos_per_task = cfg.prior_n_demos,
+        render = cfg.prior_render,
+        mask_reward = True
+    )

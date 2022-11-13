@@ -4,14 +4,15 @@ import cv2
 import numpy as np
 
 from databoost.base import DatasetGenerationPolicyBase, DatasetGeneratorBase
+from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 from databoost.envs.metaworld.utils import initialize_env
 import databoost.envs.metaworld.config as cfg
 
 
 class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
-    def __init__(self, metaworld_policy_class, **datagen_kwargs):
+    def __init__(self, metaworld_policy, **datagen_kwargs):
         super().__init__(**datagen_kwargs)
-        self.policy = metaworld_policy_class()
+        self.policy = metaworld_policy
 
     def get_action(self, env, ob: np.ndarray):
         act_noise_pct = self.datagen_kwargs.get("act_noise_pct")
@@ -25,7 +26,7 @@ class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
 
 class DatasetGeneratorMetaworld(DatasetGeneratorBase):
     def init_env(self, task_config):
-        return initialize_env(task_config.env())
+        return DataBoostBenchmarkMetaworld().get_env(task_config.task_name)
 
     def init_policy(self, env, task_config):
         act_space = env.action_space
@@ -33,7 +34,7 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         datagen_kwargs = copy.deepcopy(self.dataset_kwargs)
         datagen_kwargs.update({"act_space_ptp": act_space_ptp})
         return DatasetGenerationPolicyMetaworld(
-            task_config.expert_policy,
+            task_config.expert_policy(),
             **datagen_kwargs
         )
 
@@ -41,8 +42,10 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         return task_config.env.max_path_length
 
     def render_img(self, env):
+        # print("render", env.render)
         camera = self.dataset_kwargs.camera
-        im = env.render(offscreen=True,
+        # print(self.dataset_kwargs)
+        im = env.render(#offscreen=True,
                         camera_name=camera,
                         resolution=self.dataset_kwargs.resolution)[:, :, ::-1]
         if camera == "behindGripper":  # this view requires a 180 rotation
@@ -72,7 +75,7 @@ if __name__ == "__main__":
         },
         dest_dir = cfg.seed_dataset_dir,
         n_demos_per_task = cfg.seed_n_demos,
-        render = cfg.seed_render,
+        do_render = cfg.seed_do_render,
         mask_reward = False
     )
 
@@ -85,6 +88,6 @@ if __name__ == "__main__":
         },
         dest_dir = cfg.prior_dataset_dir,
         n_demos_per_task = cfg.prior_n_demos,
-        render = cfg.prior_render,
+        do_render = cfg.prior_do_render,
         mask_reward = True
     )
