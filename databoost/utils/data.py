@@ -34,7 +34,12 @@ def read_h5(path: str) -> Dict:
     with h5py.File(path) as F:
         data = AttrDict()
         for key in F.keys():
-            data[key] = F[key][()]
+            if key == "infos":
+                data[key] = AttrDict()
+                for sub_key in F[key].keys():
+                    data[key][sub_key] = F[f"{key}/{sub_key}"][()]
+            else:
+                data[key] = F[key][()]
     return data
 
 
@@ -45,8 +50,12 @@ def write_h5(data: Dict, dest_path: str):
         dest_path [str]: path of destination file
     '''
     with h5py.File(dest_path, "w") as F:
-        for attr in data:
-            F[attr] = data[attr]
+        for attr, val in data.items():
+            if isinstance(val, dict):
+                for sub_attr in val:
+                    F[f"{attr}/{sub_attr}"] = val[sub_attr]
+            else:
+                F[attr] = val
 
 
 def read_json(path: str) -> Any:

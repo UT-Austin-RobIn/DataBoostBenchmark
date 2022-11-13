@@ -83,16 +83,19 @@ class DataBoostEnvWrapper(gym.Wrapper):
         return self._get_dataset(self.prior_dataset_url, n_demos)
 
 
-class DatasetGenerationPolicy:
-    def get_action(ob: np.ndarray):
+class DatasetGenerationPolicyBase:
+    def __init__(self, **datagen_kwargs):
+        self.datagen_kwargs = AttrDict(datagen_kwargs)
+
+    def get_action(self, env, ob: np.ndarray):
         raise NotImplementedError
 
 
-class DatasetGenerator:
+class DatasetGeneratorBase:
     '''Base dataset generator for all offline DataBoost benchmarks
     '''
-    def __init__(self, **dataset_gen_kwargs):
-        self.dataset_gen_kwargs = dataset_gen_kwargs
+    def __init__(self, **dataset_kwargs):
+        self.dataset_kwargs = AttrDict(dataset_kwargs)
         self.traj_keys = [
             "observations",
             "actions",
@@ -102,19 +105,29 @@ class DatasetGenerator:
             "imgs"
         ]
 
-    def initialize_env(self, env):
-        return env
+    def init_env(self, task_config):
+        raise NotImplementedError
 
-    def get_max_traj_len(self):
+    def init_policy(self, env, task_config):
+        raise NotImplementedError
+
+    def get_max_traj_len(self, env, task_config):
         raise NotImplementedError
 
     def render_img(self, env):
         raise NotImplementedError
 
-    def trajectory_generator(env: gym.Env,
-                             policy: DatasetGenerationPolicy,
-                             render: bool,
-                             **data_generation_kwargs):
+    def is_success(self, env, ob, rew, done, info):
+        raise NotImplementedError
+
+    def post_process_step(self, env, ob, rew, done, info):
+        return ob, rew, done, info
+
+    def trajectory_generator(self,
+        env: gym.Env,
+        policy: DatasetGenerationPolicyBase,
+        task_config,
+        render: bool = True):
         '''Generates MujocoEnv trajectories given a policy.
         Args:
             env [MujocoEnv]: Meta-world's MujocoEnv
@@ -122,7 +135,6 @@ class DatasetGenerator:
                                 observation, with a get_action call
             render [bool]: if true, render images and store it as part of the
                            h5 dataset (render_img function must be overloaded)
-            data_generation_kwargs [Dict]: any other env/task-specific configs
         Returns:
             generator of tuple (
                 ob [np.ndarray]: env-specific observation
@@ -131,26 +143,34 @@ class DatasetGenerator:
                 done [bool]: done flag
                 info [Dict]: task-specific info
                 im [np.ndarray]: rendered image after the step
+                success [bool]: whether goal was satisfied
             )
         '''
-        env = self.initialize_env(env)
         ob = env.reset()
-        for _ in range(self.get_max_traj_len()):
-            act = policy.get_action(ob)
+        for _ in range(self.get_max_traj_len(env, task_config)):
+            act = policy.get_action(env, ob)
             ob, rew, done, info = env.step(act)
+            ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
+            success = self.is_success(env, ob, rew, done, info)
             im = None
             if render:
                 im = self.render_img(env)
-            yield ob, act, rew, done, info, im
+            yield ob, act, rew, done, info, im, success
 
+    def init_traj(self):
+        traj = AttrDict()
+        for attr in self.traj_keys:
+            traj[attr] = [] if attr != "infos" else {}
+        return traj
 
-    def add_to_traj(traj: AttrDict,
-                    ob: np.ndarray,
-                    act: np.ndarray,
-                    rew: float,
-                    done: bool,
-                    info: Dict,
-                    im: np.ndarray):
+    def add_to_traj(self,
+        traj: AttrDict,
+        ob: np.ndarray,
+        act: np.ndarray,
+        rew: float,
+        done: bool,
+        info: Dict,
+        im: np.ndarray = None):
         '''helper function to append a step's results to a trajectory dictionary
         Args:
             traj [AttrDict]: dictionary with keys {
@@ -166,99 +186,63 @@ class DatasetGenerator:
         traj.actions.append(act)
         traj.rewards.append(rew)
         traj.dones.append(done)
-        traj.infos.append(pickle.dumps(info))
-        traj.imgs.append(im)
+        for attr in info:
+            if attr not in traj.infos:
+                traj.infos[attr] = []
+            traj.infos[attr].append(info[attr])
+        if im is not None:
+            traj.imgs.append(im)
 
-
-    def traj_to_numpy(traj: AttrDict):
+    def traj_to_numpy(self, traj: AttrDict):
         '''convert trajectories attributes into numpy arrays
         Args:
             traj [AttrDict]: dictionary with keys {obs, acts, rews, dones, infos, ims}
         Returns:
             traj_numpy [AttrDict]: trajectory dict with attributes as numpy arrays
         '''
-        traj_numpy = AttrDict()
+        traj_numpy = self.init_traj()
         for attr in traj:
-            traj_numpy[attr] = np.array(traj[attr])
+            if attr != "infos":
+                traj_numpy[attr] = np.array(traj[attr])
+            else:
+                for info_attr in traj.infos:
+                    traj_numpy.infos[info_attr] = np.array(traj.infos[info_attr])
         return traj_numpy
 
-
-    def generate_dataset(
-        tasks_list: List[str],
+    def generate_dataset(self,
+        tasks: Dict[str, AttrDict],
         dest_dir: str,
         n_demos_per_task: int,
         mask_reward: bool,
-        **data_generation_kwargs: Dict):
+        render: bool = True):
         '''generates a dataset given a list of tasks and other configs.
-        
+
         Args:
             tasks_list [List[str]]: list of task names for which to generate data
             dest_dir [str]: path to directory to which the dataset is to be written
             n_demos_per_task [int]: number of demos to generate per task
             mask_reward [bool]: if true, all rewards are set to zero (for prior dataset)
         '''
-        for task_name in tasks_list:
-            task_config = cfg.tasks[task_name]
-            env = task_config.env()
-            # Set necessary env attributes
-            env = initialize_env(env)
+        for task_name, task_config in tasks.items():
+            # Initialize env and set necessary env attributes
+            env = self.init_env(task_config)
             # instantiate expert policy
-            policy = task_config.expert_policy()
+            policy = self.init_policy(env, task_config)
             # generate specified number of successful demos per seed task
             task_dir = os.path.join(dest_dir, task_name)
             os.makedirs(task_dir, exist_ok=True)
             num_success, num_tries = 0, 0
             while num_success < n_demos_per_task:
-                traj = AttrDict()
-                # initialize empty arrays
-                for attr in TRAJ_KEYS:
-                    traj[attr] = []
+                traj = self.init_traj()
                 # generate trajectories using expert policy
-                for ob, act, rew, done, info, im in trajectory_generator(
-                    env,
-                    policy,
-                    act_noise_pct=act_noise_pct,
-                    res=resolution,
-                    camera=camera):
-                        info.update({
-                            "fps": env.metadata['video.frames_per_second'],
-                            "resolution": resolution,
-                            "act_noise_pct": act_noise_pct
-                        })
-                        if info['success']: done = True
-                        if mask_reward: rew = 0.0
-                        add_to_traj(traj, ob, act, rew, done, info, im)
-                        # done is always false, as per Meta-world's
-                        # infinite-horizon MDP paradigm
-                        if info['success']:
-                            num_success += 1
-                            traj = traj_to_numpy(traj)
-                            filename = f"{task_name}_{num_success}.h5"
-                            write_h5(traj, os.path.join(task_dir, filename))
-                            break
+                for ob, act, rew, done, info, im, success in self.trajectory_generator(env, policy, task_config, render):
+                    if mask_reward: rew = 0.0
+                    self.add_to_traj(traj, ob, act, rew, done, info, im)
+                    if success:
+                        num_success += 1
+                        traj = self.traj_to_numpy(traj)
+                        filename = f"{task_name}_{num_success}.h5"
+                        write_h5(traj, os.path.join(task_dir, filename))
+                        break
                 num_tries += 1
                 print(f"generating {task_name} demos: {num_success}/{num_tries}")
-
-
-if __name__ == "__main__":
-    '''Generate seed datasets'''
-    generate_dataset(
-        tasks_list=cfg.seed_tasks_list,
-        dest_dir=cfg.seed_dataset_dir,
-        n_demos_per_task=cfg.num_seed_demos_per_task,
-        act_noise_pct=cfg.seed_action_noise_pct,
-        resolution=cfg.seed_imgs_res,
-        camera=cfg.seed_camera,
-        mask_reward=False
-    )
-
-    '''Generate prior dataset'''
-    generate_dataset(
-        tasks_list=cfg.prior_tasks_list,
-        dest_dir=cfg.prior_dataset_dir,
-        n_demos_per_task=cfg.num_prior_demos_per_task,
-        act_noise_pct=cfg.prior_action_noise_pct,
-        resolution=cfg.prior_imgs_res,
-        camera=cfg.prior_camera,
-        mask_reward=True
-    )

@@ -32,9 +32,8 @@ def visualize_h5(path: str):
         dest_path = os.path.join(dest_root, dest_filename)
         # load visualization metadata
         traj_data = read_h5(path)
-        traj_metadata = pickle.loads(traj_data.infos[0])
-        fps = traj_metadata["fps"]
-        res = traj_metadata["resolution"]
+        fps = 80
+        res = (224, 224)
         # write images of dataset to a video and save
         writer = cv2.VideoWriter(
             dest_path,

@@ -41,29 +41,35 @@ tasks = {
 }
 
 
-'''Prior tasks configs'''
-prior_dataset_dir = os.path.join(env_root, "data/prior")
-prior_action_noise_pct = 0.1
-prior_imgs_res = (224, 224)
-num_prior_demos_per_task = 20
-prior_camera = "corner"
-prior_tasks_list = [
-    "door-open",
-    "door-close",
-    "door-lock",
-    "door-unlock"
-]
-
-
 '''Seed tasks configs'''
-seed_dataset_dir = os.path.join(env_root, "data/seed")
-seed_action_noise_pct = 0.1
-seed_imgs_res = (224, 224)
-num_seed_demos_per_task = 10
-seed_camera = "corner"
 seed_tasks_list = [
     "door-open",
     "door-close",
     "door-lock",
     "door-unlock"
 ]
+seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_n_demos = 10
+seed_render = True
+seed_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
+    "resolution": (224, 224),
+    "camera": "corner"
+})
+
+
+'''Prior tasks configs'''
+prior_tasks_list = [
+    "door-open",
+    "door-close",
+    "door-lock",
+    "door-unlock"
+]
+prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_n_demos = 20
+prior_render = True
+prior_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
+    "resolution": (224, 224),
+    "camera": "corner"
+})
