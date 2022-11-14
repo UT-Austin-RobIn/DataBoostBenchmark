@@ -1,3 +1,4 @@
+import copy
 import metaworld
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
@@ -14,6 +15,7 @@ class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
     def get_env(self, task_name: str):
         task_cfg = cfg.tasks.get(task_name)
         assert task_cfg is not None, f"{task_name} is not a valid task name."
+        task_cfg = copy.deepcopy(task_cfg)
         return DataBoostEnvWrapper(
             initialize_env(task_cfg.env()),
             seed_dataset_url=task_cfg.seed_dataset,

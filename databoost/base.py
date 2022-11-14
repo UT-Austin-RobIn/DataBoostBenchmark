@@ -1,3 +1,4 @@
+import copy
 import os
 import pickle
 import random
@@ -87,7 +88,7 @@ class DatasetGenerationPolicyBase:
     def __init__(self, **datagen_kwargs):
         self.datagen_kwargs = AttrDict(datagen_kwargs)
 
-    def get_action(self, env, ob: np.ndarray):
+    def get_action(self, ob: np.ndarray):
         raise NotImplementedError
 
 
@@ -143,19 +144,18 @@ class DatasetGeneratorBase:
                 done [bool]: done flag
                 info [Dict]: task-specific info
                 im [np.ndarray]: rendered image after the step
-                success [bool]: whether goal was satisfied
             )
         '''
+        task_config = copy.deepcopy(task_config)
         ob = env.reset()
         for _ in range(self.get_max_traj_len(env, task_config)):
-            act = policy.get_action(env, ob)
-            ob, rew, done, info = env.step(act)
-            ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
-            success = self.is_success(env, ob, rew, done, info)
+            act = policy.get_action(ob)
+            nxt_ob, rew, done, info = env.step(act)
             im = None
             if do_render:
                 im = self.render_img(env)
-            yield ob, act, rew, done, info, im, success
+            yield ob, act, rew, done, info, im
+            ob = nxt_ob
 
     def init_traj(self):
         traj = AttrDict()
@@ -223,8 +223,10 @@ class DatasetGeneratorBase:
             n_demos_per_task [int]: number of demos to generate per task
             mask_reward [bool]: if true, all rewards are set to zero (for prior dataset)
         '''
+        tasks = copy.deepcopy(tasks)
         for task_name, task_config in tasks.items():
             # Initialize env and set necessary env attributes
+            task_config = copy.deepcopy(task_config)
             env = self.init_env(task_config)
             # instantiate expert policy
             policy = self.init_policy(env, task_config)
@@ -235,10 +237,11 @@ class DatasetGeneratorBase:
             while num_success < n_demos_per_task:
                 traj = self.init_traj()
                 # generate trajectories using expert policy
-                for ob, act, rew, done, info, im, success in self.trajectory_generator(env, policy, task_config, do_render):
+                for ob, act, rew, done, info, im in self.trajectory_generator(env, policy, task_config, do_render):
                     if mask_reward: rew = 0.0
+                    ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
-                    if success:
+                    if self.is_success(env, ob, rew, done, info):
                         num_success += 1
                         traj = self.traj_to_numpy(traj)
                         filename = f"{task_name}_{num_success}.h5"

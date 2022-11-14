@@ -2,26 +2,27 @@ import copy
 
 import cv2
 import numpy as np
+import torch
 
 from databoost.base import DatasetGenerationPolicyBase, DatasetGeneratorBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
-from databoost.envs.metaworld.utils import initialize_env
 import databoost.envs.metaworld.config as cfg
 
 
 class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
     def __init__(self, metaworld_policy, **datagen_kwargs):
         super().__init__(**datagen_kwargs)
-        self.policy = metaworld_policy
-
-    def get_action(self, env, ob: np.ndarray):
         act_noise_pct = self.datagen_kwargs.get("act_noise_pct")
         if act_noise_pct is None:
             act_noise_pct = np.zeros_like(env.action_space.sample())
-        act = self.policy.get_action(ob)
-        act = np.random.normal(
-            act, act_noise_pct * self.datagen_kwargs.act_space_ptp)
-        return act
+        self.act_noise = act_noise_pct * self.datagen_kwargs.act_space_ptp
+        self.policy = metaworld_policy
+
+    def get_action(self, ob: np.ndarray):
+        with torch.no_grad():
+            act = self.policy.get_action(ob)
+            act = np.random.normal(act, self.act_noise)
+            return act
 
 
 class DatasetGeneratorMetaworld(DatasetGeneratorBase):
@@ -39,14 +40,13 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         )
 
     def get_max_traj_len(self, env, task_config):
-        return task_config.env.max_path_length
+        return env.max_path_length
 
     def render_img(self, env):
         # print("render", env.render)
         camera = self.dataset_kwargs.camera
         # print(self.dataset_kwargs)
-        im = env.render(#offscreen=True,
-                        camera_name=camera,
+        im = env.render(camera_name=camera,
                         resolution=self.dataset_kwargs.resolution)[:, :, ::-1]
         if camera == "behindGripper":  # this view requires a 180 rotation
             im = cv2.rotate(im, cv2.ROTATE_180)
@@ -58,10 +58,9 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
     def post_process_step(self, env, ob, rew, done, info):
         info.update({
             "fps": env.metadata['video.frames_per_second'],
-            "resolution": self.dataset_kwargs.resolution,
-            "act_noise_pct": self.dataset_kwargs.act_noise_pct
+            "resolution": self.dataset_kwargs.resolution
         })
-        if info['success']: done = True
+        done = info['success']
         return ob, rew, done, info
 
 

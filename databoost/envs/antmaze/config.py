@@ -17,8 +17,7 @@ env_root = "/home/jullian-yapeter/code/DataBoostBenchmark/databoost/envs/antmaze
 '''Tasks configs'''
 common_task_kwargs = {
     'reward_type':'sparse',
-    'non_zero_reset':True,
-    'eval':True,
+    'non_zero_reset': True,
     'maze_size_scaling': 4.0,
     'ref_min_score': 0.0,
     'ref_max_score': 1.0,
@@ -37,7 +36,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.BIG_MAZE,
-            "goal_sampler": lambda _: (6, 6)
+            "target_cell": (6, 6)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -49,7 +48,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.BIG_MAZE,
-            "goal_sampler": lambda _: (1, 6)
+            "target_cell": (1, 6)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -61,7 +60,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.BIG_MAZE,
-            "goal_sampler": lambda _: (6, 1)
+            "target_cell": (6, 1)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -73,7 +72,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.HARDEST_MAZE,
-            "goal_sampler": lambda _: (1, 10)
+            "target_cell": (1, 10)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -85,7 +84,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.HARDEST_MAZE,
-            "goal_sampler": lambda _: (7, 10)
+            "target_cell": (7, 10)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -97,7 +96,7 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.HARDEST_MAZE,
-            "goal_sampler": lambda _: (7, 1)
+            "target_cell": (7, 1)
         },
         "seed_dataset": "",
         "expert_policy": TanhGaussianPolicy,
@@ -107,10 +106,6 @@ tasks = {
 
 
 '''Prior tasks configs'''
-prior_dataset_dir = os.path.join(env_root, "data/prior")
-prior_action_noise_pct = 0.1
-prior_imgs_res = (224, 224)
-num_prior_demos_per_task = 20
 prior_tasks_list = [
     "medium-goal-top-right",
     "medium-goal-bottom-right",
@@ -119,14 +114,29 @@ prior_tasks_list = [
     "large-goal-bottom-right",
     "large-goal-bottom-left"
 ]
+prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_n_demos = 20
+prior_do_render = True
+prior_action_noise_pct = 0.1
+prior_imgs_res = (224, 224)
+prior_dataset_kwargs = AttrDict({
+    "max_traj_len": 500,
+    "dist_thresh": 1.0,
+    "act_noise_pct": 0.05,
+    "resolution": (224, 224)
+})
 
 
 '''Seed tasks configs'''
-seed_dataset_dir = os.path.join(env_root, "data/seed")
-seed_action_noise_pct = 0.1
-seed_imgs_res = (224, 224)
-num_seed_demos_per_task = 10
-seed_camera = "corner"
 seed_tasks_list = [
     "large-goal-bottom-right"
 ]
+seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_n_demos = 10
+seed_do_render = True
+seed_dataset_kwargs = AttrDict({
+    "max_traj_len": 500,
+    "dist_thresh": 0.5,
+    "act_noise_pct": 0.05,
+    "resolution": (224, 224)
+})
