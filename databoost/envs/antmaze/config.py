@@ -30,63 +30,39 @@ common_expert_policy_kwargs = {
     "action_dim": 8
 }
 tasks = {
-    "medium-goal-top-right": AttrDict({
-        "task_name": "medium-goal-top-right",
-        "env": AntMazeEnv,
-        "env_kwargs": {
-            **copy.deepcopy(common_task_kwargs),
-            "maze_map": maze_env.BIG_MAZE,
-            "target_cell": (6, 6)
-        },
-        "seed_dataset": "",
-        "expert_policy": TanhGaussianPolicy,
-        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
-    }),
-    "medium-goal-bottom-right": AttrDict({
-        "task_name": "medium-goal-bottom-right",
-        "env": AntMazeEnv,
-        "env_kwargs": {
-            **copy.deepcopy(common_task_kwargs),
-            "maze_map": maze_env.BIG_MAZE,
-            "target_cell": (1, 6)
-        },
-        "seed_dataset": "",
-        "expert_policy": TanhGaussianPolicy,
-        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
-    }),
     "medium-goal-bottom-left": AttrDict({
         "task_name": "medium-goal-bottom-left",
         "env": AntMazeEnv,
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.BIG_MAZE,
+            "target_cell": (6, 6)
+        },
+        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-bottom-left"),
+        "expert_policy": TanhGaussianPolicy,
+        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
+    }),
+    "medium-goal-top-left": AttrDict({
+        "task_name": "medium-goal-top-left",
+        "env": AntMazeEnv,
+        "env_kwargs": {
+            **copy.deepcopy(common_task_kwargs),
+            "maze_map": maze_env.BIG_MAZE,
+            "target_cell": (1, 6)
+        },
+        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-top-left"),
+        "expert_policy": TanhGaussianPolicy,
+        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
+    }),
+    "medium-goal-top-right": AttrDict({
+        "task_name": "medium-goal-top-right",
+        "env": AntMazeEnv,
+        "env_kwargs": {
+            **copy.deepcopy(common_task_kwargs),
+            "maze_map": maze_env.BIG_MAZE,
             "target_cell": (6, 1)
         },
-        "seed_dataset": "",
-        "expert_policy": TanhGaussianPolicy,
-        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
-    }),
-    "large-goal-top-right": AttrDict({
-        "task_name": "large-goal-top-right",
-        "env": AntMazeEnv,
-        "env_kwargs": {
-            **copy.deepcopy(common_task_kwargs),
-            "maze_map": maze_env.HARDEST_MAZE,
-            "target_cell": (1, 10)
-        },
-        "seed_dataset": "",
-        "expert_policy": TanhGaussianPolicy,
-        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
-    }),
-    "large-goal-bottom-right": AttrDict({
-        "task_name": "large-goal-bottom-right",
-        "env": AntMazeEnv,
-        "env_kwargs": {
-            **copy.deepcopy(common_task_kwargs),
-            "maze_map": maze_env.HARDEST_MAZE,
-            "target_cell": (7, 10)
-        },
-        "seed_dataset": "",
+        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-top-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -96,9 +72,33 @@ tasks = {
         "env_kwargs": {
             **copy.deepcopy(common_task_kwargs),
             "maze_map": maze_env.HARDEST_MAZE,
+            "target_cell": (1, 10)
+        },
+        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-bottom-left"),
+        "expert_policy": TanhGaussianPolicy,
+        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
+    }),
+    "large-goal-top-left": AttrDict({
+        "task_name": "large-goal-top-left",
+        "env": AntMazeEnv,
+        "env_kwargs": {
+            **copy.deepcopy(common_task_kwargs),
+            "maze_map": maze_env.HARDEST_MAZE,
+            "target_cell": (7, 10)
+        },
+        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-top-left"),
+        "expert_policy": TanhGaussianPolicy,
+        "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
+    }),
+    "large-goal-top-right": AttrDict({
+        "task_name": "large-goal-top-right",
+        "env": AntMazeEnv,
+        "env_kwargs": {
+            **copy.deepcopy(common_task_kwargs),
+            "maze_map": maze_env.HARDEST_MAZE,
             "target_cell": (7, 1)
         },
-        "seed_dataset": "",
+        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-top-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     })
@@ -129,7 +129,12 @@ prior_dataset_kwargs = AttrDict({
 
 '''Seed tasks configs'''
 seed_tasks_list = [
-    "large-goal-bottom-right"
+    "medium-goal-top-right",
+    "medium-goal-bottom-right",
+    "medium-goal-bottom-left",
+    "large-goal-top-right",
+    "large-goal-bottom-right",
+    "large-goal-bottom-left"
 ]
 seed_dataset_dir = os.path.join(env_root, "data/seed")
 seed_n_demos = 10

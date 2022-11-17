@@ -78,10 +78,13 @@ class DatasetGeneratorAntMaze(DatasetGeneratorBase):
     def post_process_step(self, env, ob, rew, done, info):
         info.update({
             "fps": 20,
-            "resolution": self.dataset_kwargs.resolution
+            "resolution": self.dataset_kwargs.resolution,
+            "qpos": env.physics.data.qpos.ravel().copy(),
+            "qvel": env.physics.data.qvel.ravel().copy()
         })
         done = self.is_success(env, ob, rew, done, info)
-        return ob[:-2], rew, done, info
+        ob = ob[:-2]  # remove goal direction, same as D4RL
+        return ob, rew, done, info
 
 
 if __name__ == "__main__":
@@ -98,15 +101,15 @@ if __name__ == "__main__":
         mask_reward = False
     )
 
-    '''generate prior dataset'''
-    prior_dataset_generator = DatasetGeneratorAntMaze(**cfg.prior_dataset_kwargs)
-    prior_dataset_generator.generate_dataset(
-        tasks = {
-            task_name: task_config for task_name, task_config in cfg.tasks.items()
-            if task_name in cfg.prior_tasks_list
-        },
-        dest_dir = cfg.prior_dataset_dir,
-        n_demos_per_task = cfg.prior_n_demos,
-        do_render = cfg.prior_do_render,
-        mask_reward = True
-    )
+    # '''generate prior dataset'''
+    # prior_dataset_generator = DatasetGeneratorAntMaze(**cfg.prior_dataset_kwargs)
+    # prior_dataset_generator.generate_dataset(
+    #     tasks = {
+    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
+    #         if task_name in cfg.prior_tasks_list
+    #     },
+    #     dest_dir = cfg.prior_dataset_dir,
+    #     n_demos_per_task = cfg.prior_n_demos,
+    #     do_render = cfg.prior_do_render,
+    #     mask_reward = True
+    # )

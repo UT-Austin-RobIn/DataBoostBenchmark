@@ -21,25 +21,25 @@ tasks = {
     "door-open": AttrDict({
         "task_name": "door-open",
         "env": ALL_V2_ENVS['door-open-v2-goal-observable'],
-        "seed_dataset": "databoost/envs/metaworld/data/seed/door-open",
+        "seed_dataset": os.path.join(env_root, "data/seed/door-open"),
         "expert_policy": SawyerDoorOpenV2Policy,
     }),
     "door-close": AttrDict({
         "task_name": "door-close",
         "env": ALL_V2_ENVS['door-close-v2-goal-observable'],
-        "seed_dataset": "databoost/envs/metaworld/data/seed/door-close",
+        "seed_dataset": os.path.join(env_root, "data/seed/door-close"),
         "expert_policy": SawyerDoorCloseV2Policy,
     }),
     "door-lock": AttrDict({
         "task_name": "door-lock",
         "env": ALL_V2_ENVS['door-lock-v2-goal-observable'],
-        "seed_dataset": "databoost/envs/metaworld/data/seed/door-lock",
+        "seed_dataset": os.path.join(env_root, "data/seed/door-lock"),
         "expert_policy": SawyerDoorLockV2Policy,
     }),
     "door-unlock": AttrDict({
         "task_name": "door-unlock",
         "env": ALL_V2_ENVS['door-unlock-v2-goal-observable'],
-        "seed_dataset": "databoost/envs/metaworld/data/seed/door-unlock",
+        "seed_dataset": os.path.join(env_root, "data/seed/door-unlock"),
         "expert_policy": SawyerDoorUnlockV2Policy,
     })
 }
