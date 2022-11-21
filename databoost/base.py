@@ -7,9 +7,14 @@ from typing import Dict, List, Tuple
 import cv2
 import gym
 import numpy as np
+import torch
+from torch.utils.data import Dataset, DataLoader
 
 from databoost.utils.general import AttrDict
-from databoost.utils.data import find_h5, read_h5, write_h5, concatenate_traj_data
+from databoost.utils.data import (
+    find_h5, read_h5, write_h5,
+    get_start_end_idxs, concatenate_traj_data
+)
 
 
 class DataBoostBenchmarkBase:
@@ -25,6 +30,60 @@ class DataBoostBenchmarkBase:
 
     def evaluate(self):
         raise NotImplementedError
+
+
+class DataBoostDataset(Dataset):
+    def __init__(self, dataset_dir: str, n_demos: int = None, seq_len: int = None):
+        self.dataset_dir = dataset_dir
+        self.seq_len = seq_len
+        file_paths = find_h5(dataset_dir)
+        if n_demos is None: n_demos = len(file_paths)
+        if self.seq_len is None:
+            assert len(file_paths) >= n_demos, \
+                f"given n_demos too large. Max is {len(file_paths)}"
+            self.paths = random.sample(file_paths, n_demos)
+            return
+        self.paths = []
+        # filter for files that are long enough
+        for file_path in file_paths:
+            traj_data = read_h5(file_path)
+            traj_len = self.get_traj_len(traj_data)
+            if traj_len >= seq_len:  # traj must be long enough
+                self.paths.append(file_path)
+        print(f"{len(self.paths)}/{len(file_paths)} trajectories "
+              "are of sufficient length")
+        assert len(self.paths) >= n_demos, \
+                f"given n_demos too large. Max is {len(self.paths)}"
+        self.paths = random.sample(self.paths, n_demos)
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, idx: int):
+        traj_seq = AttrDict()
+        traj_data = read_h5(self.paths[idx])
+        if self.seq_len is None:
+            return traj_data
+        traj_len = self.get_traj_len(traj_data)
+        start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
+        slice_start_idx, slice_end_idx = random.choice(start_end_idxs)
+        for attr in traj_data:
+            if type(traj_data[attr]) in [torch.Tensor, np.ndarray] and traj_data[attr].shape[0] == traj_len:
+                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
+                assert len(traj_seq[attr]) == self.seq_len
+            else:
+                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
+                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
+        return traj_seq
+
+    def get_traj_len(self, traj_data: AttrDict) -> int:
+        '''Get length of trajectory given the AttrDict of trajectory data
+        Args:
+            traj_data [AttrDict]: trajectory data
+        Returns:
+            traj_len [int]: length of trajectory
+        '''
+        return len(traj_data.observations)
 
 
 class DataBoostEnvWrapper(gym.Wrapper):
@@ -55,13 +114,22 @@ class DataBoostEnvWrapper(gym.Wrapper):
             trajs [AttrDict]: dataset as an AttrDict
         '''
         dataset_files = find_h5(dataset_dir)
+        if n_demos is None: n_demos = len(dataset_files)
         assert len(dataset_files) >= n_demos, \
             f"given n_demos too large. Max is {len(dataset_files)}"
-        if n_demos is None: n_demos = len(dataset_files)
         rand_idxs = random.sample(range(len(dataset_files)), n_demos)
         trajs = [read_h5(dataset_files[i]) for i in rand_idxs]
         trajs = concatenate_traj_data(trajs)
         return trajs
+
+    def _get_dataloader(self,
+                        dataset_dir: str,
+                        n_demos: int = None,
+                        seq_len: int = None,
+                        batch_size: int = 1,
+                        shuffle: bool = True):
+        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_seed_dataset(self, n_demos: int = None):
         '''loads offline seed dataset corresponding to this environment & task
@@ -82,6 +150,42 @@ class DataBoostEnvWrapper(gym.Wrapper):
         '''
         assert self.prior_dataset_url is not None
         return self._get_dataset(self.prior_dataset_url, n_demos)
+
+    def get_seed_dataloader(self,
+                            n_demos: int = None,
+                            seq_len: int = None,
+                            batch_size: int = 1,
+                            shuffle: bool = True):
+        '''loads offline seed dataset corresponding to this environment & task
+        Args:
+            n_demos [int]: number of demos from dataset to load (if None, load all)
+        Returns:
+            trajs [AttrDict]: dataset as an AttrDict
+        '''
+        assert self.seed_dataset_url is not None
+        return self._get_dataloader(self.seed_dataset_url,
+                                    n_demos=n_demos,
+                                    seq_len=seq_len,
+                                    batch_size=batch_size,
+                                    shuffle=shuffle)
+
+    def get_prior_dataloader(self,
+                             n_demos: int = None,
+                             seq_len: int = None,
+                             batch_size: int = 1,
+                             shuffle: bool = True):
+        '''loads offline prior dataset corresponding to this environment
+        Args:
+            n_demos [int]: number of demos from dataset to load (if None, load all)
+        Returns:
+            trajs [AttrDict]: dataset as an AttrDict
+        '''
+        assert self.prior_dataset_url is not None
+        return self._get_dataloader(self.prior_dataset_url,
+                                    n_demos=n_demos,
+                                    seq_len=seq_len,
+                                    batch_size=batch_size,
+                                    shuffle=shuffle)
 
 
 class DatasetGenerationPolicyBase:
