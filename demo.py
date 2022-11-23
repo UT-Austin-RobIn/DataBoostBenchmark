@@ -19,11 +19,19 @@ def main():
     # get seed dataset (n_demos <= total seed demos)
     seed_dataset = env.get_seed_dataset(n_demos=5)
     for attr, val in seed_dataset.items():
+        if (isinstance(val, dict)):
+            for sub_attr, sub_val in val.items():
+                print(f"{attr}/{sub_attr} [{type(sub_val)}]: {sub_val.shape}")
+            continue
         print(f"{attr} [{type(val)}]: {val.shape}")
     print(f"num_dones: {sum(seed_dataset.dones)}")
     # get prior dataset (n_demos <= total prior demos)
     prior_dataset = env.get_prior_dataset(n_demos=30)
     for attr, val in prior_dataset.items():
+        if (isinstance(val, dict)):
+            for sub_attr, sub_val in val.items():
+                print(f"{attr}/{sub_attr} [{type(sub_val)}]: {sub_val.shape}")
+            continue
         print(f"{attr} [{type(val)}]: {val.shape}")
     print(f"num_dones: {sum(prior_dataset.dones)}")
     print(f"sum of all rewards: {prior_dataset.rewards.sum()}")
@@ -42,7 +50,7 @@ def main():
         ob, rew, done, info = env.step(act)
         print(f"{step_num}: {rew}")
         # should probably standardize render API
-        im = env.render(offscreen=True, camera_name="behindGripper",
+        im = env.render(camera_name="corner",
                         resolution=(640, 480))[:, :, ::-1]
         im = cv2.rotate(im, cv2.ROTATE_180)
         writer.write(im)

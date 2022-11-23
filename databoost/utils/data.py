@@ -84,7 +84,18 @@ def concatenate_traj_data(trajs: Tuple[AttrDict]):
     for traj in trajs:
         traj_len = len(traj.observations)
         for attr, val in traj.items():
-            assert isinstance(traj[attr], np.ndarray)
+            if isinstance(val, dict):
+                if attr not in traj_concat:
+                    traj_concat[attr] = {}
+                for sub_attr, sub_val in val.items():
+                    assert isinstance(sub_val, np.ndarray), f"attribute is of type {type(sub_val)}"
+                    assert len(sub_val) == traj_len
+                    if sub_attr not in traj_concat[attr]:
+                        traj_concat[attr][sub_attr] = sub_val
+                    else:
+                        traj_concat[attr][sub_attr] = np.concatenate((traj_concat[attr][sub_attr], sub_val), axis=0)
+                continue
+            assert isinstance(val, np.ndarray), f"attribute is of type {type(val)}"
             assert len(val) == traj_len
             if attr not in traj_concat:
                 traj_concat[attr] = val
