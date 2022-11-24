@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -5,20 +7,23 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 
+random.seed(42)
+
+
 def train(model: nn.Module, dataloader: DataLoader, n_epochs: int):
-    model = model.train()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.train().to(device)
     optimizer = optim.RAdam(model.parameters())
     for epoch in range(int(n_epochs)):
         losses = []
-        for batch_num, traj in enumerate(dataloader):
+        for batch_num, traj_batch in enumerate(dataloader):
             optimizer.zero_grad()
-            obs = torch.tensor(traj["observations"]).to(device)
-            obs = obs[:, 0]
-            pred_action_dist = model(obs.float())
-            actions = torch.tensor(traj["actions"]).to(device)
-            actions = actions[:, 0]
-            loss = pred_action_dist.nll(actions)
+            obs_batch = traj_batch["observations"].to(device)
+            obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
+            pred_action_dist = model(obs_batch.float())
+            action_batch = traj_batch["actions"].to(device)
+            action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
+            loss = model.loss(pred_action_dist, action_batch)
             losses.append(loss.item())
             loss.backward()
             optimizer.step()
@@ -30,19 +35,41 @@ if __name__ == "__main__":
     from databoost.models.bc import BCPolicy
     
 
-    benchmark = databoost.get_benchmark("metaworld")
-    env = benchmark.get_env("door-open")
+    benchmark_name = "metaworld"
+    task_name = "door-open"
+
+    benchmark = databoost.get_benchmark(benchmark_name)
+    env = benchmark.get_env(task_name)
     seed_dataloader = env.get_seed_dataloader(
         batch_size=1,
-        seq_len=1
+        seq_len=1,
+        shuffle=True
     )
+    # prior_dataloader = env.get_prior_dataloader(
+    #     batch_size=1,
+    #     seq_len=1,
+    #     shuffle=True
+    # )
     
-    policy = BCPolicy(
+    seed_policy = BCPolicy(
         obs_dim=39,
         action_dim=4,
         hidden_dim=64,
         n_hidden_layers=6
     )
+    # prior_policy = BCPolicy(
+    #     obs_dim=39,
+    #     action_dim=4,
+    #     hidden_dim=64,
+    #     n_hidden_layers=6
+    # )
 
-    trained_policy = train(policy, seed_dataloader, n_epochs=1e3)
-    torch.save(trained_policy, "my_door_open_policy.pt")
+    seed_policy = train(seed_policy, seed_dataloader, n_epochs=1e3)
+    torch.save(seed_policy, f"seed_{benchmark_name}_{task_name}_policy.pt")
+
+    # prior_policy = train(prior_policy, prior_dataloader, n_epochs=1e2)
+    # torch.save(prior_policy, f"prior_{benchmark_name}_policy.pt")
+
+    # prior_policy = torch.load(f"prior_{benchmark_name}_policy.pt")
+    # finetuned_prior_policy = train(prior_policy, seed_dataloader, n_epochs=500)
+    # torch.save(finetuned_prior_policy, f"finetuned_prior_{benchmark_name}_{task_name}_policy.pt")

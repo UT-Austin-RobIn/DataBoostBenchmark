@@ -5,6 +5,9 @@ __pycache__/
 *.avi
 *.h5
 
+# Trained models
+*.pt
+
 # Distribution / packaging
 develop-eggs/
 eggs/

@@ -9,11 +9,12 @@ from databoost.utils.general import AttrDict
 
 
 def find_h5(dir: str) -> List[str]:
-    '''Get list of h5 file paths
+    '''Get list of h5 file paths.
+
     Args:
         dir [str]: path to directory of interest
     Returns:
-        file_paths [List[str]]: h5 file paths within dir
+        file_paths [List[str]]: sorted list of h5 file paths within dir
     '''
     file_paths = []
     for root, _, files in os.walk(dir):
@@ -25,41 +26,52 @@ def find_h5(dir: str) -> List[str]:
 
 
 def read_h5(path: str) -> Dict:
-    '''Read h5 file
+    '''Read h5 file into dictionary
     Args:
         path [str]: path to the h5 file
     Returns:
         data [Dict]: data of h5 file
     '''
-    with h5py.File(path) as F:
+    def unpack_h5_recurse(h5_data):
         data = AttrDict()
-        for key in F.keys():
-            if key == "infos":
-                data[key] = AttrDict()
-                for sub_key in F[key].keys():
-                    data[key][sub_key] = F[f"{key}/{sub_key}"][()]
+        for key in h5_data.keys():
+            if hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
+                data[key] = unpack_h5_recurse(h5_data[key])
             else:
-                data[key] = F[key][()]
+                data[key] = h5_data[key][()]
+        return data
+
+    with h5py.File(path) as F:
+        data = unpack_h5_recurse(F)
     return data
 
 
 def write_h5(data: Dict, dest_path: str):
     '''Copy selected trajectory of a dataset to the destination directory as an h5 file.
+
     Args:
         data [AttrDict]: dictionary of data to be written to an h5 file
         dest_path [str]: path of destination file
     '''
-    with h5py.File(dest_path, "w") as F:
+    def pack_h5_recurse(h5_file, data, prefix=None):
         for attr, val in data.items():
             if isinstance(val, dict):
-                for sub_attr in val:
-                    F[f"{attr}/{sub_attr}"] = val[sub_attr]
+                pack_h5_recurse(h5_file, val,
+                                prefix=f"{prefix}/{attr}" if prefix is not None \
+                                else attr)
             else:
-                F[attr] = val
+                if prefix is None:
+                    h5_file[attr] = val
+                else:
+                    h5_file[f"{prefix}/{attr}"] = val
+
+    with h5py.File(dest_path, "w") as F:
+        pack_h5_recurse(F, data)
 
 
 def read_json(path: str) -> Any:
-    '''Read JSON file
+    '''Read JSON file into dictionary.
+
     Args:
         path [str]: path to the JSON file
     Returns:
@@ -70,7 +82,8 @@ def read_json(path: str) -> Any:
 
 
 def write_json(obj: Any, dest_path: str):
-    '''Write JSON file to destination path
+    '''Write JSON file to destination path.
+
     Args:
         obj [Any]: data to be written to JSON
         dest_path [str]: destination path of the JSON file
@@ -79,21 +92,22 @@ def write_json(obj: Any, dest_path: str):
         json.dump(obj, F)
 
 
-def concatenate_traj_data(trajs: Tuple[AttrDict]):
-    traj_concat = AttrDict()
-    for traj in trajs:
-        traj_len = len(traj.observations)
+def concatenate_traj_data(trajs: Tuple[AttrDict]) -> AttrDict:
+    ''' Given a tuple of attribute dictionaries each representing a trajectory,
+    concatenate all the trajectories to a single attribute dictionary (as if
+    one trajectory).
+
+    Args:
+        trajs [Tuple[AttrDict]]: tuple of trajectories to be concatenated
+    Returns:
+        traj_concat [AttrDict]: attribute dictionary of concatenated trajectories
+    '''
+    def concat_traj_data_recurse(traj_concat, traj, traj_len):
         for attr, val in traj.items():
             if isinstance(val, dict):
                 if attr not in traj_concat:
                     traj_concat[attr] = {}
-                for sub_attr, sub_val in val.items():
-                    assert isinstance(sub_val, np.ndarray), f"attribute is of type {type(sub_val)}"
-                    assert len(sub_val) == traj_len
-                    if sub_attr not in traj_concat[attr]:
-                        traj_concat[attr][sub_attr] = sub_val
-                    else:
-                        traj_concat[attr][sub_attr] = np.concatenate((traj_concat[attr][sub_attr], sub_val), axis=0)
+                concat_traj_data_recurse(traj_concat[attr], val, traj_len)
                 continue
             assert isinstance(val, np.ndarray), f"attribute is of type {type(val)}"
             assert len(val) == traj_len
@@ -101,10 +115,18 @@ def concatenate_traj_data(trajs: Tuple[AttrDict]):
                 traj_concat[attr] = val
             else:
                 traj_concat[attr] = np.concatenate((traj_concat[attr], val), axis=0)
+
+    traj_concat = AttrDict()
+    for traj in trajs:
+        traj_len = len(traj.observations)
+        concat_traj_data_recurse(traj_concat, traj, traj_len)
     return traj_concat
 
 
-def get_start_end_idxs(traj_len: int, window: int, stride: int = 1, keep_last: bool = True) -> List[int]:
+def get_start_end_idxs(traj_len: int,
+                       window: int,
+                       stride: int = 1,
+                       keep_last: bool = True) -> List[int]:
     '''Computes list of start and end indices given the trajectory length, window, and stride
     Args:
         traj_len [int]: trajectory length

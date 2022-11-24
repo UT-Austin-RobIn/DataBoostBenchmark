@@ -70,7 +70,7 @@ prior_tasks_list = [
     "door-unlock"
 ]
 prior_dataset_dir = os.path.join(env_root, "data/prior")
-prior_n_demos = 20
+prior_n_demos = 30
 prior_do_render = True
 prior_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,

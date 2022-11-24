@@ -36,6 +36,7 @@ HARDEST_MAZE = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 [1, G, 0, 1, 0, 0, 0, 1, 0, 0, G, 1],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
 '''
+# task configurations that are common among all tasks
 common_task_kwargs = {
     'reward_type':'sparse',
     'non_zero_reset': True,
@@ -45,7 +46,8 @@ common_task_kwargs = {
     'v2_resets': True,
 }
 common_expert_policy_kwargs = {
-    "state_dict_path": os.path.join(env_root, "data/policy/antmaze_expert_policy_state_dict.pt"),
+    "state_dict_path": os.path.join(
+        env_root, "data/policy/antmaze_expert_policy_state_dict.pt"),
     "hidden_sizes": [256, 256],
     "obs_dim": 29,
     "action_dim": 8
@@ -59,7 +61,8 @@ tasks = {
             "maze_map": maze_env.BIG_MAZE,
             "target_cell": (6, 6)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-top-left"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/medium-goal-top-left"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -71,7 +74,8 @@ tasks = {
             "maze_map": maze_env.BIG_MAZE,
             "target_cell": (1, 6)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-bottom-left"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/medium-goal-bottom-left"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -83,7 +87,8 @@ tasks = {
             "maze_map": maze_env.BIG_MAZE,
             "target_cell": (6, 1)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-top-right"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/medium-goal-top-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -95,7 +100,8 @@ tasks = {
             "maze_map": maze_env.BIG_MAZE,
             "target_cell": (1, 1)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/medium-goal-bottom-right"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/medium-goal-bottom-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -107,7 +113,8 @@ tasks = {
             "maze_map": maze_env.HARDEST_MAZE,
             "target_cell": (7, 10)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-top-left"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/large-goal-top-left"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -119,7 +126,8 @@ tasks = {
             "maze_map": maze_env.HARDEST_MAZE,
             "target_cell": (1, 10)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-bottom-left"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/large-goal-bottom-left"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -131,7 +139,8 @@ tasks = {
             "maze_map": maze_env.HARDEST_MAZE,
             "target_cell": (7, 1)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-top-right"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/large-goal-top-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),
@@ -143,7 +152,8 @@ tasks = {
             "maze_map": maze_env.HARDEST_MAZE,
             "target_cell": (1, 1)
         },
-        "seed_dataset": os.path.join(env_root, "data/seed/large-goal-bottom-right"),
+        "seed_dataset": os.path.join(
+            env_root, "data/seed/large-goal-bottom-right"),
         "expert_policy": TanhGaussianPolicy,
         "expert_policy_kwargs": copy.deepcopy(common_expert_policy_kwargs)
     }),

@@ -1,9 +1,23 @@
 import random
 
 import cv2
+import torch
 
 import databoost
 
+
+def print_traj_shapes(traj_batch, prefix=None):
+    for attr, val in traj_batch.items():
+        if (isinstance(val, dict)):
+            if prefix is None:
+                print_traj_shapes(val, attr)
+            else:
+                print_traj_shapes(val, f"{prefix}/{attr}")
+            continue
+        if prefix is None:
+            print(f"{attr} [{type(val)}]: {val.shape}")
+        else:
+            print(f"{prefix}/{attr} [{type(val)}]: {val.shape}")
 
 def main():
     # list out benchmarks
@@ -13,29 +27,35 @@ def main():
     # list out benchmark tasks
     print(f"tasks: {benchmark.tasks_list}")
     # choose task
-    task = random.choice(benchmark.tasks_list)
+    task = "door-open"
     # instantiate corresponding environment
     env = benchmark.get_env(task)
     # get seed dataset (n_demos <= total seed demos)
+    print("\n---Seed Dataset---")
     seed_dataset = env.get_seed_dataset(n_demos=5)
-    for attr, val in seed_dataset.items():
-        if (isinstance(val, dict)):
-            for sub_attr, sub_val in val.items():
-                print(f"{attr}/{sub_attr} [{type(sub_val)}]: {sub_val.shape}")
-            continue
-        print(f"{attr} [{type(val)}]: {val.shape}")
+    print_traj_shapes(seed_dataset)
     print(f"num_dones: {sum(seed_dataset.dones)}")
+    print(f"sum of all rewards: {seed_dataset.rewards.sum()}")
+    # alternatively, get seed dataloader
+    print("\n---Seed Dataloader---")
+    seed_dataloader = env.get_seed_dataloader(n_demos=5, seq_len=10, batch_size=3, shuffle=True)
+    for seed_traj_batch in seed_dataloader:
+        print_traj_shapes(seed_traj_batch)
+        break
     # get prior dataset (n_demos <= total prior demos)
+    print("\n---Prior Dataset---")
     prior_dataset = env.get_prior_dataset(n_demos=30)
-    for attr, val in prior_dataset.items():
-        if (isinstance(val, dict)):
-            for sub_attr, sub_val in val.items():
-                print(f"{attr}/{sub_attr} [{type(sub_val)}]: {sub_val.shape}")
-            continue
-        print(f"{attr} [{type(val)}]: {val.shape}")
+    print_traj_shapes(prior_dataset)
     print(f"num_dones: {sum(prior_dataset.dones)}")
     print(f"sum of all rewards: {prior_dataset.rewards.sum()}")
+    # alternatively, get prior dataloader
+    print("\n---Prior Dataloader---")
+    prior_dataloader = env.get_prior_dataloader(n_demos=20, seq_len=10, batch_size=3, shuffle=True)
+    for prior_traj_batch in prior_dataloader:
+        print_traj_shapes(prior_traj_batch)
+        break
     # policy and video writer for demo purposes
+    print("\n---Online Env Interaction---")
     policy = databoost.envs.metaworld.config.tasks[task].expert_policy()
     writer = cv2.VideoWriter(
         f'{task}_demo.avi',
@@ -45,7 +65,7 @@ def main():
     )
     # interact with environment
     ob = env.reset()
-    for step_num in range(env.max_path_length):
+    for step_num in range(10):
         act = policy.get_action(ob)
         ob, rew, done, info = env.step(act)
         print(f"{step_num}: {rew}")
@@ -55,6 +75,17 @@ def main():
         im = cv2.rotate(im, cv2.ROTATE_180)
         writer.write(im)
     writer.release()
+    # train/load a policy
+    policy = torch.load("my_door_open_policy_1.pt")
+    # evaluate the policy using the benchmark
+    print("\n---Policy Evaluation---")
+    success_rate = benchmark.evaluate(
+        task_name=task,
+        policy=policy,
+        n_episodes=100,
+        max_traj_len=500
+    )
+    print(f"policy success rate: {success_rate}")
 
 if __name__ == "__main__":
     main()

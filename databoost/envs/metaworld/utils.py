@@ -1,7 +1,7 @@
 from metaworld.envs.mujoco.mujoco_env import MujocoEnv
 
 
-def initialize_env(env: MujocoEnv):
+def initialize_env(env: MujocoEnv) -> MujocoEnv:
     '''Sets environment attributes to prepare it for
     online use.
     Args:

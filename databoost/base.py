@@ -8,7 +8,9 @@ import cv2
 import gym
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
@@ -28,8 +30,25 @@ class DataBoostBenchmarkBase:
     def get_env(self, task_name: str):
         raise NotImplementedError
 
-    def evaluate(self):
+    def evaluate_success(self, env, ob, rew, done, info) -> bool:
         raise NotImplementedError
+
+    def evaluate(self, task_name: str, policy: nn.Module, n_episodes: int, max_traj_len: int):
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        env = self.get_env(task_name)
+        policy = policy.eval().to(device)
+        n_successes = 0
+        for episode in tqdm(range(int(n_episodes))):
+            ob = env.reset()
+            for _ in range(max_traj_len):
+                with torch.no_grad():
+                    act = policy.get_action(ob)
+                ob, rew, done, info = env.step(act)
+                if self.evaluate_success(env, ob, rew, done, info):
+                    n_successes += 1
+                    break
+        success_rate = n_successes / n_episodes
+        return success_rate
 
 
 class DataBoostDataset(Dataset):
@@ -67,13 +86,7 @@ class DataBoostDataset(Dataset):
         traj_len = self.get_traj_len(traj_data)
         start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
         slice_start_idx, slice_end_idx = random.choice(start_end_idxs)
-        for attr in traj_data:
-            if type(traj_data[attr]) in [torch.Tensor, np.ndarray] and traj_data[attr].shape[0] == traj_len:
-                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
-                assert len(traj_seq[attr]) == self.seq_len
-            else:
-                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
+        traj_seq = self.get_traj_slice(traj_data, traj_len, slice_start_idx, slice_end_idx)
         return traj_seq
 
     def get_traj_len(self, traj_data: AttrDict) -> int:
@@ -84,6 +97,19 @@ class DataBoostDataset(Dataset):
             traj_len [int]: length of trajectory
         '''
         return len(traj_data.observations)
+
+    def get_traj_slice(self, traj_data, traj_len, slice_start_idx, slice_end_idx):
+        traj_seq = AttrDict()
+        for attr in traj_data:
+            if isinstance(traj_data[attr], dict):
+                traj_seq[attr] = self.get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
+            elif isinstance(traj_data[attr], (torch.Tensor, np.ndarray)) and traj_data[attr].shape[0] == traj_len:
+                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
+                assert len(traj_seq[attr]) == self.seq_len
+            else:
+                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
+                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
+        return traj_seq
 
 
 class DataBoostEnvWrapper(gym.Wrapper):
