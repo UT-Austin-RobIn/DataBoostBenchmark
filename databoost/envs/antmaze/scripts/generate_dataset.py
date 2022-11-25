@@ -8,7 +8,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from databoost.base import DatasetGenerationPolicyBase, DatasetGeneratorBase
+from databoost.base import \
+    DataBoostEnvWrapper, DatasetGenerationPolicyBase, DatasetGeneratorBase
 from databoost.utils.general import AttrDict
 from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
 import databoost.envs.antmaze.config as cfg
@@ -77,7 +78,7 @@ class DatasetGenerationPolicyAntMaze(DatasetGenerationPolicyBase):
 
 
 class DatasetGeneratorAntMaze(DatasetGeneratorBase):
-    def init_env(self, task_config: AttrDict) -> gym.Env:
+    def init_env(self, task_config: AttrDict) -> DataBoostEnvWrapper:
         '''creates an AntMaze environment according to the task specification
         and returns the initialized environment to be used for data collection.
 
@@ -86,7 +87,7 @@ class DatasetGeneratorAntMaze(DatasetGeneratorBase):
                                     importantly, contains task_name, expert_policy
                                     for data collection,and any expert_policy_kwargs.
         Returns:
-            ant_maze_env [gym.Env]: the requested AntMaze environment
+            ant_maze_env [DataBoostEnvWrapper]: the requested AntMaze environment
         '''
         ant_maze_env = DataBoostBenchmarkAntMaze(
                         eval_mode=False).get_env(task_config.task_name)

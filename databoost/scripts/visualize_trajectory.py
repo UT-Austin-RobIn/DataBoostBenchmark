@@ -17,10 +17,7 @@ def visualize_h5(path: str):
                     render videos of all h5 files under the directory
     '''
     # if path is directory, visualize all h5 files under directory
-    if os.path.isdir(path):
-        paths = find_h5(path)
-    else:
-        paths = [path]
+    paths = find_h5(path) if os.path.isdir(path) else [path]
 
     for path in paths:
         # save videos to in a directory called "movies" at the same directory
@@ -32,8 +29,14 @@ def visualize_h5(path: str):
         dest_path = os.path.join(dest_root, dest_filename)
         # load visualization metadata
         traj_data = read_h5(path)
-        fps = traj_data.infos.fps[0]
-        resolution = traj_data.infos.resolution[0]
+        try:
+            fps = traj_data.infos.fps[0]
+        except (KeyError, IndexError):
+            fps = 20
+        try:
+            resolution = traj_data.infos.resolution[0]
+        except (KeyError, IndexError):
+            resolution = (224, 224)
         # write images of dataset to a video and save
         writer = cv2.VideoWriter(
             dest_path,

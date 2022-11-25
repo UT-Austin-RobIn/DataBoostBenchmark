@@ -19,99 +19,6 @@ from databoost.utils.data import (
 )
 
 
-class DataBoostBenchmarkBase:
-    '''DataBoostBenchmark is a wrapper to standardize the benchmark across
-    environments and tasks. This class includes functionality to load the
-    environment and datasets (both seed and prior)
-    '''
-    def __init__(self):
-        self.tasks_list = None
-
-    def get_env(self, task_name: str):
-        raise NotImplementedError
-
-    def evaluate_success(self, env, ob, rew, done, info) -> bool:
-        raise NotImplementedError
-
-    def evaluate(self, task_name: str, policy: nn.Module, n_episodes: int, max_traj_len: int):
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        env = self.get_env(task_name)
-        policy = policy.eval().to(device)
-        n_successes = 0
-        for episode in tqdm(range(int(n_episodes))):
-            ob = env.reset()
-            for _ in range(max_traj_len):
-                with torch.no_grad():
-                    act = policy.get_action(ob)
-                ob, rew, done, info = env.step(act)
-                if self.evaluate_success(env, ob, rew, done, info):
-                    n_successes += 1
-                    break
-        success_rate = n_successes / n_episodes
-        return success_rate
-
-
-class DataBoostDataset(Dataset):
-    def __init__(self, dataset_dir: str, n_demos: int = None, seq_len: int = None):
-        self.dataset_dir = dataset_dir
-        self.seq_len = seq_len
-        file_paths = find_h5(dataset_dir)
-        if n_demos is None: n_demos = len(file_paths)
-        if self.seq_len is None:
-            assert len(file_paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(file_paths)}"
-            self.paths = random.sample(file_paths, n_demos)
-            return
-        self.paths = []
-        # filter for files that are long enough
-        for file_path in file_paths:
-            traj_data = read_h5(file_path)
-            traj_len = self.get_traj_len(traj_data)
-            if traj_len >= seq_len:  # traj must be long enough
-                self.paths.append(file_path)
-        print(f"{len(self.paths)}/{len(file_paths)} trajectories "
-              "are of sufficient length")
-        assert len(self.paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(self.paths)}"
-        self.paths = random.sample(self.paths, n_demos)
-
-    def __len__(self):
-        return len(self.paths)
-
-    def __getitem__(self, idx: int):
-        traj_seq = AttrDict()
-        traj_data = read_h5(self.paths[idx])
-        if self.seq_len is None:
-            return traj_data
-        traj_len = self.get_traj_len(traj_data)
-        start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
-        slice_start_idx, slice_end_idx = random.choice(start_end_idxs)
-        traj_seq = self.get_traj_slice(traj_data, traj_len, slice_start_idx, slice_end_idx)
-        return traj_seq
-
-    def get_traj_len(self, traj_data: AttrDict) -> int:
-        '''Get length of trajectory given the AttrDict of trajectory data
-        Args:
-            traj_data [AttrDict]: trajectory data
-        Returns:
-            traj_len [int]: length of trajectory
-        '''
-        return len(traj_data.observations)
-
-    def get_traj_slice(self, traj_data, traj_len, slice_start_idx, slice_end_idx):
-        traj_seq = AttrDict()
-        for attr in traj_data:
-            if isinstance(traj_data[attr], dict):
-                traj_seq[attr] = self.get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
-            elif isinstance(traj_data[attr], (torch.Tensor, np.ndarray)) and traj_data[attr].shape[0] == traj_len:
-                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
-                assert len(traj_seq[attr]) == self.seq_len
-            else:
-                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
-        return traj_seq
-
-
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
     capability to gym environments.
@@ -214,18 +121,236 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     shuffle=shuffle)
 
 
+class DataBoostBenchmarkBase:
+    def __init__(self):
+        '''DataBoostBenchmark is a wrapper to standardize the benchmark across
+        environments and tasks. This class includes functionality to load the
+        environment and datasets (both seed and prior).
+
+        Attributes:
+            tasks_list [List[str]]: list of task names associated with this
+                                    benchmark
+        '''
+        self.tasks_list = None
+
+    def get_env(self, task_name: str) -> DataBoostEnvWrapper:
+        '''get the wrapped gym environment corresponding to the specified task.
+
+        Args:
+            task_name [str]: the name of the task; must be from the list of
+                             tasks compatible with this benchmark (self.tasks_list)
+        Returns:
+            env [DataBoostEnvWrapper]: wrapped env that implements getters for
+                                       the corresponding seed and prior offline
+                                       datasets
+        '''
+        raise NotImplementedError
+
+    def evaluate_success(self,
+                         env: gym.Env,
+                         ob: np.ndarray,
+                         rew: float,
+                         done: bool,
+                         info: Dict) -> bool:
+        '''evaluates whether the given environment step constitutes a success
+        in terms of the task at hand. This is used in the benchmark's policy
+        evaluator.
+
+        Args:
+            env [gym.Env]: gym environment
+            ob [np.ndarray]: an observation of the environment this step
+            rew [float]: reward received for this env step
+            done [bool]: whether the trajectory has reached an end
+            info [Dict]: metadata of the environment step
+        Returns:
+            success [bool]: success flag
+        '''
+        raise NotImplementedError
+
+    def evaluate(self,
+                 task_name: str,
+                 policy: nn.Module,
+                 n_episodes: int,
+                 max_traj_len: int) -> float:
+        '''Evaluates the performance of a given policy on the specified task.
+
+        Args:
+            task_name [str]: name of the task to evaluate policy against
+            policy [nn.Module]: the policy to evaluate (must implement
+                                act = get_action(ob) function)
+            n_episodes [int]: number of evaluation episodes
+            max_traj_len [int]: max number of steps for one episode
+        Returns:
+            success_rate [float]: success rate (n_successes/n_episodes)
+        '''
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        env = self.get_env(task_name)
+        policy = policy.eval().to(device)
+        n_successes = 0
+        for episode in tqdm(range(int(n_episodes))):
+            ob = env.reset()
+            for _ in range(max_traj_len):
+                with torch.no_grad():
+                    act = policy.get_action(ob)
+                ob, rew, done, info = env.step(act)
+                if self.evaluate_success(env, ob, rew, done, info):
+                    n_successes += 1
+                    break
+        success_rate = n_successes / n_episodes
+        return success_rate
+
+
+class DataBoostDataset(Dataset):
+    def __init__(self, dataset_dir: str, n_demos: int = None, seq_len: int = None):
+        '''DataBoostDataset is a pytorch Dataset class for loading h5-based
+        offline trajectory data from a given directory of h5 files.
+        Will return AttrDict object where each attribute is of shape:
+        (seq_len, *attribute shape).
+
+        Args:
+            dataset_dir [str]: path to the directory from which to load h5
+                               trajectory data
+            n_demos [int]: number of separate h5 files to sample from;
+                           if None, sample from all h5 files in the given
+                           directory
+            seq_len [int]: length of trajectory subsequences to load from files;
+                           if None, then will load whole trajectory of each h5
+                           file sampled. NOTE: if no seq_len specified, loading
+                           batches of size > 1 will result in collate errors
+                           since the dimensions will not be equal across
+                           trajectories
+        '''
+        self.dataset_dir = dataset_dir
+        self.seq_len = seq_len
+        file_paths = find_h5(dataset_dir)
+        if n_demos is None: n_demos = len(file_paths)
+        if self.seq_len is None:
+            # if no seq_len is 
+            assert len(file_paths) >= n_demos, \
+                f"given n_demos too large. Max is {len(file_paths)}"
+            self.paths = random.sample(file_paths, n_demos)
+            return
+        self.paths = []
+        # filter for files that are long enough
+        for file_path in file_paths:
+            traj_data = read_h5(file_path)
+            traj_len = self.get_traj_len(traj_data)
+            if traj_len >= seq_len:  # traj must be long enough
+                self.paths.append(file_path)
+        print(f"{len(self.paths)}/{len(file_paths)} trajectories "
+              "are of sufficient length")
+        assert len(self.paths) >= n_demos, \
+                f"given n_demos too large. Max is {len(self.paths)}"
+        self.paths = random.sample(self.paths, n_demos)
+
+    def __len__(self) -> int:
+        '''returns length of the dataset; number of h5 files associated with
+        this dataset.
+
+        Returns:
+            len(self.paths) [int]: number of h5 files that the dataset can sample
+        '''
+        return len(self.paths)
+
+    def __getitem__(self, idx: int) -> Dict:
+        '''get item from the dataset; a dictionary of trajectory data.
+
+        Args:
+            idx [int]: index of h5 file
+        Returns:
+            traj_seq [dict]: dictionary of trajectory data, sliced to a random
+                             subsequence of specified seq_len; or use whole
+                             trajectory if seq_len was not specified
+        '''
+        traj_data = read_h5(self.paths[idx])
+        if self.seq_len is None:
+            return traj_data
+        traj_len = self.get_traj_len(traj_data)
+        start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
+        slice_start_idx, slice_end_idx = random.choice(start_end_idxs)
+        traj_seq = self.get_traj_slice(traj_data, traj_len, slice_start_idx, slice_end_idx)
+        return traj_seq
+
+    def get_traj_len(self, traj_data: Dict) -> int:
+        '''Get length of trajectory given the dictionary of trajectory data
+        Args:
+            traj_data [Dict]: trajectory data
+        Returns:
+            traj_len [int]: length of trajectory
+        '''
+        return len(traj_data["observations"])
+
+    def get_traj_slice(self,
+                       traj_data: Dict,
+                       traj_len: int,
+                       slice_start_idx: int,
+                       slice_end_idx: int):
+        '''Slice a dictionary of trajectory data to the specified start and end
+        indices.
+
+        Args:
+            traj_data [Dict]: the dictionary of trajectory data to be sliced
+            traj_len [int]: the length (steps) of the given trajectory data
+            slice_start_idx [int]: the starting index of the subsequence to be
+                                   returned
+            slice_end_idx [int]: 1 + the ending index of the subsequence to be
+                                 returned
+        '''
+        traj_seq = {}
+        for attr in traj_data:
+            if isinstance(traj_data[attr], dict):
+                # if it's a nested dictionary, recursively call this slice function
+                traj_seq[attr] = self.get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
+            elif isinstance(traj_data[attr], (torch.Tensor, np.ndarray)) and traj_data[attr].shape[0] == traj_len:
+                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
+                # assert that each attribute will have shape (seq_len, *attribute shape)
+                assert len(traj_seq[attr]) == self.seq_len
+            else:
+                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
+                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
+        return traj_seq
+
+
 class DatasetGenerationPolicyBase:
     def __init__(self, **datagen_kwargs):
+        '''DataGeneratioPolicyBase standardizes the interface of expert policies
+        used to generate offline datasets for each environment. Namely, it
+        accepts general datagen_kwargs that are environment and task-specific,
+        and enforces a get_action function to be implemented for each child class.
+
+        Args:
+            datagen_kwargs [Dict]: env/task-specific configurations to be defined
+                                   & used by child classes
+        Attributes:
+            datagen_kwargs [Dict]: env/task-specific configurations to be defined
+                                   & used by child classes
+        '''
         self.datagen_kwargs = AttrDict(datagen_kwargs)
 
-    def get_action(self, ob: np.ndarray):
+    def get_action(self, ob: np.ndarray) -> np.ndarray:
+        '''return an action given an observation.
+
+        Args:
+            ob [np.ndarray]: an observation from the env step
+        Returns:
+            act [np.ndarray]: an action determined by the expert policy
+        '''
         raise NotImplementedError
 
 
 class DatasetGeneratorBase:
-    '''Base dataset generator for all offline DataBoost benchmarks
-    '''
-    def __init__(self, **dataset_kwargs):
+    def __init__(self, **dataset_kwargs: Dict):
+        '''Base dataset generator for all offline DataBoost benchmarks.
+
+        Args:
+            dataset_kwargs [Dict]: env/task-specific configurations to be defined
+                                   & used by child classes
+        Attributes:
+            dataset_kwargs [Dict]: env/task-specific configurations to be defined
+                                   & used by child classes
+            traj_keys [List[str]]: list of attributes in dictionary of 
+                                   offline data trajectories
+        '''
         self.dataset_kwargs = AttrDict(dataset_kwargs)
         self.traj_keys = [
             "observations",
@@ -236,10 +361,24 @@ class DatasetGeneratorBase:
             "imgs"
         ]
 
-    def init_env(self, task_config):
+    def init_env(self, task_config: Dict) -> DataBoostEnvWrapper:
+        '''creates an Meta-WOrld environment according to the task specification
+        and returns the initialized environment to be used for data collection.
+
+        Args:
+            task_config [AttrDict]: contains configs for dataset generation;
+                                    importantly, contains task_name, expert_policy
+                                    for data collection,and any expert_policy_kwargs.
+        Returns:
+            env [DataBoostEnvWrapper]: the requested environment
+        '''
         raise NotImplementedError
 
-    def init_policy(self, env, task_config):
+    def init_policy(self,
+                    env: gym.Env,
+                    task_config: Dict) -> DatasetGenerationPolicyBase:
+        '''
+        '''
         raise NotImplementedError
 
     def get_max_traj_len(self, env, task_config):

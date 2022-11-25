@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 import torch
 
-from databoost.base import DatasetGenerationPolicyBase, DatasetGeneratorBase
+from databoost.base import \
+    DataBoostEnvWrapper, DatasetGenerationPolicyBase, DatasetGeneratorBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 import databoost.envs.metaworld.config as cfg
 
@@ -26,7 +27,17 @@ class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
 
 
 class DatasetGeneratorMetaworld(DatasetGeneratorBase):
-    def init_env(self, task_config):
+    def init_env(self, task_config) -> DataBoostEnvWrapper:
+        '''creates an Meta-WOrld environment according to the task specification
+        and returns the initialized environment to be used for data collection.
+
+        Args:
+            task_config [AttrDict]: contains configs for dataset generation;
+                                    importantly, contains task_name, expert_policy
+                                    for data collection,and any expert_policy_kwargs.
+        Returns:
+            env [DataBoostEnvWrapper]: the requested Meta-World environment
+        '''
         return DataBoostBenchmarkMetaworld().get_env(task_config.task_name)
 
     def init_policy(self, env, task_config):
