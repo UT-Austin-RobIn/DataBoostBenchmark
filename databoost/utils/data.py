@@ -126,13 +126,13 @@ def concatenate_traj_data(trajs: Tuple[AttrDict]) -> AttrDict:
 def get_start_end_idxs(traj_len: int,
                        window: int,
                        stride: int = 1,
-                       keep_last: bool = True) -> List[int]:
+                       keep_last: bool = True) -> List[Tuple[int]]:
     '''Computes list of start and end indices given the trajectory length, window, and stride
     Args:
         traj_len [int]: trajectory length
         keep_last [bool]: whether to keep the last subtrajectory if the window does not include it
     Returns:
-        start_end_idxs [List[int]]: numpy array of start & end indices, shape (num slices, 2)
+        start_end_idxs [List[Tuple[int]]]: numpy array of start & end indices, shape (num slices, 2)
     '''
     num_slices = int((traj_len - window) / stride + 1)
     start_end_idxs = [[idx * stride, idx * stride + window] for idx in range(num_slices)]

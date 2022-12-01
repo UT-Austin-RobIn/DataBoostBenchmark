@@ -324,7 +324,7 @@ seed_tasks_list = [
     "plate-slide-back-side"
 ]
 seed_dataset_dir = os.path.join(env_root, "data/seed")
-seed_n_demos = 100
+seed_n_demos = 10
 seed_do_render = True
 seed_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
