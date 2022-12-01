@@ -1,3 +1,4 @@
+import os
 import random
 
 import numpy as np
@@ -5,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 
 random.seed(42)
@@ -13,8 +15,8 @@ random.seed(42)
 def train(model: nn.Module, dataloader: DataLoader, n_epochs: int):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.train().to(device)
-    optimizer = optim.RAdam(model.parameters())
-    for epoch in range(int(n_epochs)):
+    optimizer = optim.Adam(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
+    for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in enumerate(dataloader):
             optimizer.zero_grad()
@@ -34,42 +36,27 @@ if __name__ == "__main__":
     import databoost
     from databoost.models.bc import BCPolicy
     
-
+    dest_dir = "/data/jullian-yapeter/DataBoostBenchmark/metaworld/models"
     benchmark_name = "metaworld"
-    task_name = "door-open"
+    task_name = "assembly"
 
     benchmark = databoost.get_benchmark(benchmark_name)
     env = benchmark.get_env(task_name)
     seed_dataloader = env.get_seed_dataloader(
-        batch_size=1,
+        n_demos=10,
+        batch_size=64,
         seq_len=1,
         shuffle=True
     )
-    # prior_dataloader = env.get_prior_dataloader(
-    #     batch_size=1,
-    #     seq_len=1,
-    #     shuffle=True
-    # )
     
     seed_policy = BCPolicy(
         obs_dim=39,
         action_dim=4,
-        hidden_dim=64,
-        n_hidden_layers=6
+        hidden_dim=512,
+        n_hidden_layers=4,
+        dropout_rate=0.4
     )
-    # prior_policy = BCPolicy(
-    #     obs_dim=39,
-    #     action_dim=4,
-    #     hidden_dim=64,
-    #     n_hidden_layers=6
-    # )
 
-    seed_policy = train(seed_policy, seed_dataloader, n_epochs=1e3)
-    torch.save(seed_policy, f"seed_{benchmark_name}_{task_name}_policy.pt")
-
-    # prior_policy = train(prior_policy, prior_dataloader, n_epochs=1e2)
-    # torch.save(prior_policy, f"prior_{benchmark_name}_policy.pt")
-
-    # prior_policy = torch.load(f"prior_{benchmark_name}_policy.pt")
-    # finetuned_prior_policy = train(prior_policy, seed_dataloader, n_epochs=500)
-    # torch.save(finetuned_prior_policy, f"finetuned_prior_{benchmark_name}_{task_name}_policy.pt")
+    seed_policy = train(seed_policy, seed_dataloader, n_epochs=150)
+    torch.save(seed_policy, os.path.join(dest_dir,
+                                         f"seed_{benchmark_name}_{task_name}_policy_3.pt"))

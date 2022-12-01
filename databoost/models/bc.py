@@ -10,7 +10,8 @@ class BCPolicy(nn.Module):
                  obs_dim: int,
                  action_dim: int,
                  hidden_dim: int,
-                 n_hidden_layers: int):
+                 n_hidden_layers: int,
+                 dropout_rate: float):
         '''Baseline BC policy.
 
         Args:
@@ -29,12 +30,12 @@ class BCPolicy(nn.Module):
         net_layers.append(nn.Linear(obs_dim, hidden_dim))
         net_layers.append(nn.LayerNorm(hidden_dim))
         net_layers.append(nn.LeakyReLU())
-        net_layers.append(nn.Dropout(p=0.2))
+        net_layers.append(nn.Dropout(p=dropout_rate))
         for _ in range(n_hidden_layers):
             net_layers.append(nn.Linear(hidden_dim, hidden_dim))
             net_layers.append(nn.LayerNorm(hidden_dim))
             net_layers.append(nn.LeakyReLU())
-            net_layers.append(nn.Dropout(p=0.2))
+            net_layers.append(nn.Dropout(p=dropout_rate))
         net_layers.append(nn.Linear(hidden_dim, action_dim * 2))
         self.net = nn.Sequential(*net_layers).float().to(self.device)
 

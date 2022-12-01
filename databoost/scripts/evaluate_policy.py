@@ -1,3 +1,4 @@
+import os
 import random
 
 import torch
@@ -9,13 +10,15 @@ random.seed(42)
 
 
 # train/load a policy
-task = "door-open"
-policy_path = "seed_metaworld_door-open_policy.pt"
-policy = torch.load(policy_path)
+benchmark = "metaworld"
+task = "assembly"
+policy_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark}/models"
+policy_filename = f"seed_{benchmark}_{task}_policy_3.pt"
+policy = torch.load(os.path.join(policy_dir, policy_filename))
 
-print(f"evaluating {policy_path} on {task} task")
+print(f"evaluating {policy_filename} on {task} task")
 # initialize appropriate benchmark with corresponding task
-benchmark = databoost.get_benchmark("metaworld")
+benchmark = databoost.get_benchmark(benchmark)
 # evaluate the policy using the benchmark
 success_rate = benchmark.evaluate(
     task_name=task,

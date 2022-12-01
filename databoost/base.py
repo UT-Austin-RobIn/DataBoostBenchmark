@@ -15,7 +15,7 @@ from tqdm import tqdm
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
     find_h5, read_h5, write_h5,
-    get_start_end_idxs, concatenate_traj_data
+    get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
 
@@ -225,11 +225,20 @@ class DataBoostDataset(Dataset):
         file_paths = find_h5(dataset_dir)
         if n_demos is None: n_demos = len(file_paths)
         if self.seq_len is None:
-            # if no seq_len is 
+            # if no seq_len is given, no need to proceed with slicing.
+            # use whole trajectories.
             assert len(file_paths) >= n_demos, \
                 f"given n_demos too large. Max is {len(file_paths)}"
             self.paths = random.sample(file_paths, n_demos)
+
+            self.slices = []
+            for path_id, path in enumerate(self.paths):
+                traj_data = read_h5(path)
+                traj_len = self.get_traj_len(traj_data)
+                self.slices.append((path_id, 0, traj_len))
+            print(f"Dataloader contains {len(self.slices)} slices")
             return
+
         self.paths = []
         # filter for files that are long enough
         for file_path in file_paths:
@@ -243,14 +252,23 @@ class DataBoostDataset(Dataset):
                 f"given n_demos too large. Max is {len(self.paths)}"
         self.paths = random.sample(self.paths, n_demos)
 
+        self.slices = []
+        for path_id, path in enumerate(self.paths):
+            traj_data = read_h5(path)
+            traj_len = self.get_traj_len(traj_data)
+            start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
+            traj_slices = [(path_id, *start_end_idx) for start_end_idx in start_end_idxs]
+            self.slices += traj_slices
+        print(f"Dataloader contains {len(self.slices)} slices")
+
     def __len__(self) -> int:
-        '''returns length of the dataset; number of h5 files associated with
+        '''returns length of the dataset; number of traj slices associated with
         this dataset.
 
         Returns:
-            len(self.paths) [int]: number of h5 files that the dataset can sample
+            len(self.slices) [int]: number of traj slices that the dataset can sample
         '''
-        return len(self.paths)
+        return len(self.slices)
 
     def __getitem__(self, idx: int) -> Dict:
         '''get item from the dataset; a dictionary of trajectory data.
@@ -262,13 +280,12 @@ class DataBoostDataset(Dataset):
                              subsequence of specified seq_len; or use whole
                              trajectory if seq_len was not specified
         '''
-        traj_data = read_h5(self.paths[idx])
+        path_id, start_idx, end_idx = self.slices[idx]
+        traj_data = read_h5(self.paths[path_id])
         if self.seq_len is None:
             return traj_data
         traj_len = self.get_traj_len(traj_data)
-        start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
-        slice_start_idx, slice_end_idx = random.choice(start_end_idxs)
-        traj_seq = self.get_traj_slice(traj_data, traj_len, slice_start_idx, slice_end_idx)
+        traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
@@ -279,36 +296,6 @@ class DataBoostDataset(Dataset):
             traj_len [int]: length of trajectory
         '''
         return len(traj_data["observations"])
-
-    def get_traj_slice(self,
-                       traj_data: Dict,
-                       traj_len: int,
-                       slice_start_idx: int,
-                       slice_end_idx: int):
-        '''Slice a dictionary of trajectory data to the specified start and end
-        indices.
-
-        Args:
-            traj_data [Dict]: the dictionary of trajectory data to be sliced
-            traj_len [int]: the length (steps) of the given trajectory data
-            slice_start_idx [int]: the starting index of the subsequence to be
-                                   returned
-            slice_end_idx [int]: 1 + the ending index of the subsequence to be
-                                 returned
-        '''
-        traj_seq = {}
-        for attr in traj_data:
-            if isinstance(traj_data[attr], dict):
-                # if it's a nested dictionary, recursively call this slice function
-                traj_seq[attr] = self.get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
-            elif isinstance(traj_data[attr], (torch.Tensor, np.ndarray)) and traj_data[attr].shape[0] == traj_len:
-                traj_seq[attr] = copy.deepcopy(traj_data[attr][slice_start_idx: slice_end_idx])
-                # assert that each attribute will have shape (seq_len, *attribute shape)
-                assert len(traj_seq[attr]) == self.seq_len
-            else:
-                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(self.seq_len)])
-        return traj_seq
 
 
 class DatasetGenerationPolicyBase:

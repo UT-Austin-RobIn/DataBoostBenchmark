@@ -1,0 +1,17 @@
+{
+    "gray_bowl": 20,
+    "black_bowl": 20,
+    "blue_bowl": 21,
+    "white_plate": 19,
+    "gray_plate": 10,
+    "green_cup": 13,
+    "yellow_cup": 23,
+    "long_bread": 21,
+    "square_bread": 17,
+    "milk_dairy": 21,
+    "butter_dairy": 29,
+    "burger_meat": 18,
+    "steak_meat": 24,
+    "apple_fruit": 26,
+    "orange_fruit": 32
+}
