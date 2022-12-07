@@ -31,11 +31,11 @@ def visualize_h5(path: str):
         traj_data = read_h5(path)
         try:
             fps = traj_data.infos.fps[0]
-        except (KeyError, IndexError):
+        except Exception:
             fps = 20
         try:
             resolution = traj_data.infos.resolution[0]
-        except (KeyError, IndexError):
+        except Exception:
             resolution = (224, 224)
         # write images of dataset to a video and save
         writer = cv2.VideoWriter(
@@ -44,7 +44,7 @@ def visualize_h5(path: str):
             fps,
             resolution
         )
-        for im in traj_data.imgs:
+        for im in traj_data.front_cam_ob:
             writer.write(im)
         writer.release()
 

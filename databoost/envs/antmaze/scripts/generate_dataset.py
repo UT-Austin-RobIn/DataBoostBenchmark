@@ -13,7 +13,7 @@ from databoost.base import \
 from databoost.utils.general import AttrDict
 from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
 import databoost.envs.antmaze.config as cfg
-from databoost.envs.antmaze.utils import initialize_env
+from databoost.envs.antmaze.utils import initialize_env, render
 
 
 class DatasetGenerationPolicyAntMaze(DatasetGenerationPolicyBase):
@@ -150,9 +150,7 @@ class DatasetGeneratorAntMaze(DatasetGeneratorBase):
         Returns:
             im [np.ndarray]: an image representation of the env's current state
         '''
-        width, height = self.dataset_kwargs.resolution
-        im = env.physics.render(width=width, height=height, depth=False)
-        im = cv2.rotate(im[:, :, ::-1], cv2.ROTATE_180)
+        im = render(env, self.dataset_kwargs)
         return im
 
     def is_success(self,

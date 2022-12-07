@@ -6,11 +6,12 @@ import gym
 import numpy as np
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
-from databoost.envs.antmaze.utils import initialize_env
+from databoost.envs.antmaze.utils import initialize_env, render
 import databoost.envs.antmaze.config as cfg
 
 
 class DataBoostBenchmarkAntMaze(DataBoostBenchmarkBase):
+
     def __init__(self, eval_mode=True):
         '''AntMaze DataBoost benchmark.
 
@@ -43,7 +44,8 @@ class DataBoostBenchmarkAntMaze(DataBoostBenchmarkBase):
                     NormalizedBoxEnv(
                         task_cfg.env(**task_cfg.env_kwargs, eval=self.eval))),
                 seed_dataset_url=task_cfg.seed_dataset,
-                prior_dataset_url=cfg.prior_dataset_dir
+                prior_dataset_url=cfg.prior_dataset_dir,
+                render_func=render
             )
         return env
 

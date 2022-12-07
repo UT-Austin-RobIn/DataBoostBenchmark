@@ -8,6 +8,7 @@ from databoost.base import \
     DataBoostEnvWrapper, DatasetGenerationPolicyBase, DatasetGeneratorBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 import databoost.envs.metaworld.config as cfg
+from databoost.envs.metaworld.utils import render
 
 
 class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
@@ -54,13 +55,7 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         return env.max_path_length
 
     def render_img(self, env):
-        # print("render", env.render)
-        camera = self.dataset_kwargs.camera
-        # print(self.dataset_kwargs)
-        im = env.render(camera_name=camera,
-                        resolution=self.dataset_kwargs.resolution)[:, :, ::-1]
-        if camera == "behindGripper":  # this view requires a 180 rotation
-            im = cv2.rotate(im, cv2.ROTATE_180)
+        im = render(env, self.dataset_kwargs)
         return im
 
     def is_success(self, env, ob, rew, done, info):

@@ -6,11 +6,12 @@ import metaworld
 import numpy as np
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
-from databoost.envs.metaworld.utils import initialize_env
+from databoost.envs.metaworld.utils import initialize_env, render
 import databoost.envs.metaworld.config as cfg
 
 
 class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
+
     def __init__(self):
         '''Meta-World DataBoost benchmark.
 
@@ -36,7 +37,8 @@ class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
         env = DataBoostEnvWrapper(
                 initialize_env(task_cfg.env()),
                 seed_dataset_url=task_cfg.seed_dataset,
-                prior_dataset_url=cfg.prior_dataset_dir
+                prior_dataset_url=cfg.prior_dataset_dir,
+                render_func=render
             )
         return env
 

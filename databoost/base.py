@@ -2,7 +2,7 @@ import copy
 import os
 import pickle
 import random
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import cv2
 import gym
@@ -33,10 +33,13 @@ class DataBoostEnvWrapper(gym.Wrapper):
     def __init__(self,
                  env: gym.Env,
                  prior_dataset_url: str,
-                 seed_dataset_url: str):
+                 seed_dataset_url: str,
+                 render_func: Callable):
         super().__init__(env)
+        self.env = env
         self.prior_dataset_url = prior_dataset_url
         self.seed_dataset_url = seed_dataset_url
+        self.render_func = render_func
 
     def _get_dataset(self, dataset_dir: str, n_demos: int = None):
         '''loads offline dataset.
@@ -120,6 +123,10 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     batch_size=batch_size,
                                     shuffle=shuffle)
 
+    def default_render(self):
+        im = self.render_func(self.env)
+        return im
+
 
 class DataBoostBenchmarkBase:
     def __init__(self):
@@ -171,7 +178,8 @@ class DataBoostBenchmarkBase:
                  task_name: str,
                  policy: nn.Module,
                  n_episodes: int,
-                 max_traj_len: int) -> float:
+                 max_traj_len: int,
+                 render: bool = False) -> float:
         '''Evaluates the performance of a given policy on the specified task.
 
         Args:
@@ -187,17 +195,29 @@ class DataBoostBenchmarkBase:
         env = self.get_env(task_name)
         policy = policy.eval().to(device)
         n_successes = 0
+        if render: gifs = []
         for episode in tqdm(range(int(n_episodes))):
+            if render: gif = []
             ob = env.reset()
-            for _ in range(max_traj_len):
+            if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
+            for _ in range(max_traj_len - 1):
                 with torch.no_grad():
                     act = policy.get_action(ob)
                 ob, rew, done, info = env.step(act)
+                if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
                 if self.evaluate_success(env, ob, rew, done, info):
                     n_successes += 1
                     break
+            if render and len(gif) > 0:
+                if len(gif) < max_traj_len:
+                    last_frame = gif[-1]
+                    last_frame[1] += 20  # make pad frame green
+                    pad = [last_frame for _ in range(max_traj_len - len(gif))]
+                    gif += pad
+                gifs.append(np.stack(gif))
         success_rate = n_successes / n_episodes
-        return success_rate
+        if render: gifs = np.concatenate(gifs, axis=-1)
+        return (success_rate, gifs) if render else success_rate
 
 
 class DataBoostDataset(Dataset):

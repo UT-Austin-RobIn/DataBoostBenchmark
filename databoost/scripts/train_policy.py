@@ -7,56 +7,169 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import wandb
+
+from databoost.base import DataBoostBenchmarkBase
 
 
 random.seed(42)
 
 
-def train(model: nn.Module, dataloader: DataLoader, n_epochs: int):
+def dump_video_wandb(vid, tag, entity=None, project=None, fps=20):
+    assert len(vid.shape) == 4 and vid.shape[1] == 3
+    if vid.max() <= 1.0:
+        vid = np.asarray(vid * 255.0, dtype=np.uint8)
+    if entity is not None and project is not None:
+        init_wandb(entity, project)
+    wandb.log({tag: [wandb.Video(vid, fps=fps, format="mp4")]})
+
+
+def train(policy: nn.Module,
+          dataloader: DataLoader,
+          benchmark: DataBoostBenchmarkBase,
+          exp_name: str,
+          benchmark_name: str,
+          task_name: str,
+          dest_dir: str,
+          eval_period: int,
+          eval_episodes: int,
+          max_traj_len: int,
+          n_epochs: int):
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.train().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
+    policy = policy.train().to(device)
+    optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
+    best_success_rate = 0
+
     for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in enumerate(dataloader):
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
             obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
-            pred_action_dist = model(obs_batch.float())
+            pred_action_dist = policy(obs_batch.float())
             action_batch = traj_batch["actions"].to(device)
             action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
-            loss = model.loss(pred_action_dist, action_batch)
+            loss = policy.loss(pred_action_dist, action_batch)
             losses.append(loss.item())
             loss.backward()
             optimizer.step()
         print(f"epoch {epoch}: loss = {np.mean(losses)}")
-    return model
+        wandb.log({"epoch": epoch, "loss": np.mean(losses)})
+        if epoch % eval_period == 0:
+            print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
+            success_rate = benchmark.evaluate(
+                task_name=task_name,
+                policy=policy,
+                n_episodes=eval_episodes,
+                max_traj_len=max_traj_len
+            )
+            wandb.log({"epoch": epoch, "success_rate": success_rate})
+            print(f"epoch {epoch}: success_rate = {success_rate}")
+            if success_rate >= best_success_rate:
+                torch.save(policy, os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                best_success_rate = success_rate
+            
+    return policy
 
 if __name__ == "__main__":
     import databoost
     from databoost.models.bc import BCPolicy
-    
-    dest_dir = "/data/jullian-yapeter/DataBoostBenchmark/metaworld/models"
+
+
+    exp_name = "metaworld-assembly-seed-1"
     benchmark_name = "metaworld"
     task_name = "assembly"
+    boosting_method = "seed"
+    dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
 
+
+    dataloader_configs = {
+        "n_demos": 5,
+        "batch_size": 64,
+        "seq_len": 1,
+        "shuffle": True
+    }
+
+    policy_configs = {
+        "obs_dim": 39,
+        "action_dim": 4,
+        "hidden_dim": 512,
+        "n_hidden_layers": 4,
+        "dropout_rate": 0.4
+    }
+
+    train_configs = {
+        "exp_name": exp_name,
+        "benchmark_name": benchmark_name,
+        "task_name": task_name,
+        "dest_dir": dest_dir,
+        "eval_period": 5,
+        "eval_episodes": 20,
+        "max_traj_len": 500,
+        "n_epochs": 100
+    }
+
+    eval_configs = {
+        "task_name": task_name,
+        "n_episodes": 100,
+        "max_traj_len": 500
+    }
+
+    rollout_configs = {
+        "task_name": task_name,
+        "n_episodes": 10,
+        "max_traj_len": 500,
+        "render": True
+    }
+
+    configs = {
+        "dataloader_configs": dataloader_configs,
+        "policy_configs": policy_configs,
+        "train_configs": train_configs,
+        "eval_configs": eval_configs,
+        "rollout_configs": rollout_configs
+    }
+
+    wandb.init(
+        resume=exp_name,
+        project="boost",
+        config=configs,
+        dir="/tmp",
+        entity="clvr",
+        notes="",
+    )
+
+    os.makedirs(dest_dir, exist_ok=True)
     benchmark = databoost.get_benchmark(benchmark_name)
     env = benchmark.get_env(task_name)
-    seed_dataloader = env.get_seed_dataloader(
-        n_demos=10,
-        batch_size=64,
-        seq_len=1,
-        shuffle=True
-    )
-    
-    seed_policy = BCPolicy(
-        obs_dim=39,
-        action_dim=4,
-        hidden_dim=512,
-        n_hidden_layers=4,
-        dropout_rate=0.4
-    )
+    seed_dataloader = env.get_seed_dataloader(**dataloader_configs)
 
-    seed_policy = train(seed_policy, seed_dataloader, n_epochs=150)
-    torch.save(seed_policy, os.path.join(dest_dir,
-                                         f"seed_{benchmark_name}_{task_name}_policy_3.pt"))
+    # policy = BCPolicy(**policy_configs)
+    # policy = train(policy=policy,
+    #                dataloader=seed_dataloader,
+    #                benchmark=benchmark,
+    #                **train_configs)
+
+    # torch.save(policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    # success_rate = benchmark.evaluate(
+    #     policy=policy,
+    #     **eval_configs
+    # )
+    # print(f"final success_rate: {success_rate}")
+    # wandb.log({"final_success_rate": success_rate})
+
+    best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
+    # success_rate = benchmark.evaluate(
+    #     policy=best_policy,
+    #     **eval_configs
+    # )
+    # print(f"best success_rate: {success_rate}")
+    # wandb.log({"best_success_rate": success_rate})
+
+    '''generate sample policy rollouts'''
+    success_rate, gifs = benchmark.evaluate(
+        policy=best_policy,
+        **rollout_configs
+    )
+    dump_video_wandb(gifs, "rollouts")
