@@ -29,6 +29,14 @@ class DataBoostEnvWrapper(gym.Wrapper):
         env [gym.Env]: instance of Open AI's gym environment
         prior_dataset_url [str]: location of prior dataset
         seed_dataset_url [str]: location of seed dataset
+        render_func [Callable]: environment-specific render function;
+                                to create a standardized default_render()
+    Attributes:
+        env [gym.Env]: instance of Open AI's gym environment
+        prior_dataset_url [str]: location of prior dataset
+        seed_dataset_url [str]: location of seed dataset
+        render_func [Callable]: environment-specific render function;
+                                to create a standardized default_render()
     '''
     def __init__(self,
                  env: gym.Env,
@@ -41,7 +49,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         self.seed_dataset_url = seed_dataset_url
         self.render_func = render_func
 
-    def _get_dataset(self, dataset_dir: str, n_demos: int = None):
+    def _get_dataset(self, dataset_dir: str, n_demos: int = None) -> AttrDict:
         '''loads offline dataset.
         Args:
             dataset_dir [str]: path to dataset directory
@@ -50,6 +58,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
             trajs [AttrDict]: dataset as an AttrDict
         '''
         dataset_files = find_h5(dataset_dir)
+        # if n_demos not specified, use all h5 files in the given dataset dir
         if n_demos is None: n_demos = len(dataset_files)
         assert len(dataset_files) >= n_demos, \
             f"given n_demos too large. Max is {len(dataset_files)}"
@@ -63,11 +72,23 @@ class DataBoostEnvWrapper(gym.Wrapper):
                         n_demos: int = None,
                         seq_len: int = None,
                         batch_size: int = 1,
-                        shuffle: bool = True):
+                        shuffle: bool = True) -> DataLoader:
+        '''gets a dataloader to load in h5 data from the given dataset_dir.
+
+        Args:
+            dataset_dir [str]: directory of h5 data
+            n_demos [int]: the number of demos (h5 files) to retrieve from the
+                           dataset dir
+            seq_len [int]: the window length with which to split demonstrations
+            batch_size [int]: number of sequences to load in as a batch
+            shuffle [bool]: shuffle sequences to be loaded
+        Returns:
+            dataloader [DataLoader]: DataLoader for given dataset directory
+        '''
         dataset = DataBoostDataset(dataset_dir, n_demos, seq_len)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    def get_seed_dataset(self, n_demos: int = None):
+    def get_seed_dataset(self, n_demos: int = None) -> Dataset:
         '''loads offline seed dataset corresponding to this environment & task
         Args:
             n_demos [int]: number of demos from dataset to load (if None, load all)
@@ -77,7 +98,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         assert self.seed_dataset_url is not None
         return self._get_dataset(self.seed_dataset_url, n_demos)
 
-    def get_prior_dataset(self, n_demos: int = None):
+    def get_prior_dataset(self, n_demos: int = None) -> Dataset:
         '''loads offline prior dataset corresponding to this environment
         Args:
             n_demos [int]: number of demos from dataset to load (if None, load all)
@@ -91,12 +112,17 @@ class DataBoostEnvWrapper(gym.Wrapper):
                             n_demos: int = None,
                             seq_len: int = None,
                             batch_size: int = 1,
-                            shuffle: bool = True):
-        '''loads offline seed dataset corresponding to this environment & task
+                            shuffle: bool = True) -> DataLoader:
+        '''gets a dataloader for this benchmark's seed dataset.
+
         Args:
-            n_demos [int]: number of demos from dataset to load (if None, load all)
+            n_demos [int]: the number of demos (h5 files) to retrieve from the
+                           dataset dir
+            seq_len [int]: the window length with which to split demonstrations
+            batch_size [int]: number of sequences to load in as a batch
+            shuffle [bool]: shuffle sequences to be loaded
         Returns:
-            trajs [AttrDict]: dataset as an AttrDict
+            dataloader [DataLoader]: seed DataLoader for this benchmark
         '''
         assert self.seed_dataset_url is not None
         return self._get_dataloader(self.seed_dataset_url,
@@ -109,12 +135,17 @@ class DataBoostEnvWrapper(gym.Wrapper):
                              n_demos: int = None,
                              seq_len: int = None,
                              batch_size: int = 1,
-                             shuffle: bool = True):
-        '''loads offline prior dataset corresponding to this environment
+                             shuffle: bool = True) -> DataLoader:
+        '''gets a dataloader for this benchmark's prior dataset.
+
         Args:
-            n_demos [int]: number of demos from dataset to load (if None, load all)
+            n_demos [int]: the number of demos (h5 files) to retrieve from the
+                           dataset dir
+            seq_len [int]: the window length with which to split demonstrations
+            batch_size [int]: number of sequences to load in as a batch
+            shuffle [bool]: shuffle sequences to be loaded
         Returns:
-            trajs [AttrDict]: dataset as an AttrDict
+            dataloader [DataLoader]: prior DataLoader for this benchmark
         '''
         assert self.prior_dataset_url is not None
         return self._get_dataloader(self.prior_dataset_url,
@@ -123,7 +154,13 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     batch_size=batch_size,
                                     shuffle=shuffle)
 
-    def default_render(self):
+    def default_render(self) -> np.ndarray:
+        '''standard API to wrap environment-specific render function with
+        default configurations as set in the passed-in render_func().
+
+        Returns:
+            im [np.ndarray]: image rendered with default render function
+        '''
         im = self.render_func(self.env)
         return im
 
@@ -179,7 +216,7 @@ class DataBoostBenchmarkBase:
                  policy: nn.Module,
                  n_episodes: int,
                  max_traj_len: int,
-                 render: bool = False) -> float:
+                 render: bool = False) -> Tuple[float, np.ndarray]:
         '''Evaluates the performance of a given policy on the specified task.
 
         Args:
@@ -188,14 +225,17 @@ class DataBoostBenchmarkBase:
                                 act = get_action(ob) function)
             n_episodes [int]: number of evaluation episodes
             max_traj_len [int]: max number of steps for one episode
+            render [bool]: whether to return gif of eval rollouts
         Returns:
-            success_rate [float]: success rate (n_successes/n_episodes)
+            result [Tuple[float, np.ndarray]]: tuple of success rate
+                                               (n_successes/n_episodes) and
+                                               gif (None if render is False)
         '''
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
         policy = policy.eval().to(device)
         n_successes = 0
-        if render: gifs = []
+        gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
             if render: gif = []
             ob = env.reset()
@@ -217,11 +257,14 @@ class DataBoostBenchmarkBase:
                 gifs.append(np.stack(gif))
         success_rate = n_successes / n_episodes
         if render: gifs = np.concatenate(gifs, axis=-1)
-        return (success_rate, gifs) if render else success_rate
+        return (success_rate, gifs)
 
 
 class DataBoostDataset(Dataset):
-    def __init__(self, dataset_dir: str, n_demos: int = None, seq_len: int = None):
+    def __init__(self,
+                 dataset_dir: str,
+                 n_demos: int = None,
+                 seq_len: int = None):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
         Will return AttrDict object where each attribute is of shape:
@@ -239,6 +282,14 @@ class DataBoostDataset(Dataset):
                            batches of size > 1 will result in collate errors
                            since the dimensions will not be equal across
                            trajectories
+        Attributes:
+            dataset_dir [str]: path to the directory from which to load h5
+                               trajectory data
+            seq_len [int]: length of trajectory subsequences to load from files;
+                           if None, then will load whole trajectory of each h5
+                           file sampled
+            paths [List[str]]: list of h5 file paths to load in
+            slices [List[Tuple[int]]]: list of tuples (path, start_idx, end_idx)
         '''
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len

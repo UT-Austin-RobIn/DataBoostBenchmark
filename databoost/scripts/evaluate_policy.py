@@ -20,10 +20,11 @@ print(f"evaluating {policy_filename} on {task} task")
 # initialize appropriate benchmark with corresponding task
 benchmark = databoost.get_benchmark(benchmark)
 # evaluate the policy using the benchmark
-success_rate = benchmark.evaluate(
+success_rate, gif = benchmark.evaluate(
     task_name=task,
     policy=policy,
     n_episodes=100,
-    max_traj_len=500
+    max_traj_len=500,
+    render=False
 )
 print(f"policy success rate: {success_rate}")

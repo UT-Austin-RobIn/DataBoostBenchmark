@@ -1,3 +1,4 @@
+# import argparse
 import os
 import random
 
@@ -58,11 +59,12 @@ def train(policy: nn.Module,
         wandb.log({"epoch": epoch, "loss": np.mean(losses)})
         if epoch % eval_period == 0:
             print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
-            success_rate = benchmark.evaluate(
+            success_rate, _ = benchmark.evaluate(
                 task_name=task_name,
                 policy=policy,
                 n_episodes=eval_episodes,
-                max_traj_len=max_traj_len
+                max_traj_len=max_traj_len,
+                render=False
             )
             wandb.log({"epoch": epoch, "success_rate": success_rate})
             print(f"epoch {epoch}: success_rate = {success_rate}")
@@ -77,15 +79,23 @@ if __name__ == "__main__":
     from databoost.models.bc import BCPolicy
 
 
-    exp_name = "metaworld-assembly-seed-1"
+    # '''temp'''
+    # parser = argparse.ArgumentParser(
+    #     description='temp')
+    # parser.add_argument("--boosting_method", help="boosting method")
+    # args = parser.parse_args()
+    # ''''''
+
     benchmark_name = "metaworld"
-    task_name = "assembly"
-    boosting_method = "seed"
+    task_name = "pick-place-wall"
+    boosting_method = args.boosting_method
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-1"
     dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
 
-
     dataloader_configs = {
-        "n_demos": 5,
+        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",
+        "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/boosted_data/{task_name}/{boosting_method}",
+        "n_demos": None,
         "batch_size": 64,
         "seq_len": 1,
         "shuffle": True
@@ -112,15 +122,14 @@ if __name__ == "__main__":
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 100,
+        "n_episodes": 300,
         "max_traj_len": 500
     }
 
     rollout_configs = {
         "task_name": task_name,
         "n_episodes": 10,
-        "max_traj_len": 500,
-        "render": True
+        "max_traj_len": 500
     }
 
     configs = {
@@ -143,33 +152,36 @@ if __name__ == "__main__":
     os.makedirs(dest_dir, exist_ok=True)
     benchmark = databoost.get_benchmark(benchmark_name)
     env = benchmark.get_env(task_name)
-    seed_dataloader = env.get_seed_dataloader(**dataloader_configs)
+    dataloader = env._get_dataloader(**dataloader_configs)
 
-    # policy = BCPolicy(**policy_configs)
-    # policy = train(policy=policy,
-    #                dataloader=seed_dataloader,
-    #                benchmark=benchmark,
-    #                **train_configs)
+    policy = BCPolicy(**policy_configs)
+    policy = train(policy=policy,
+                   dataloader=dataloader,
+                   benchmark=benchmark,
+                   **train_configs)
 
-    # torch.save(policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
-    # success_rate = benchmark.evaluate(
-    #     policy=policy,
-    #     **eval_configs
-    # )
-    # print(f"final success_rate: {success_rate}")
-    # wandb.log({"final_success_rate": success_rate})
+    torch.save(policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    success_rate, _ = benchmark.evaluate(
+        policy=policy,
+        render=False,
+        **eval_configs
+    )
+    print(f"final success_rate: {success_rate}")
+    wandb.log({"final_success_rate": success_rate})
 
     best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
-    # success_rate = benchmark.evaluate(
-    #     policy=best_policy,
-    #     **eval_configs
-    # )
-    # print(f"best success_rate: {success_rate}")
-    # wandb.log({"best_success_rate": success_rate})
+    success_rate, _ = benchmark.evaluate(
+        policy=best_policy,
+        render=False,
+        **eval_configs
+    )
+    print(f"best success_rate: {success_rate}")
+    wandb.log({"best_success_rate": success_rate})
 
     '''generate sample policy rollouts'''
     success_rate, gifs = benchmark.evaluate(
         policy=best_policy,
+        render=True,
         **rollout_configs
     )
     dump_video_wandb(gifs, "rollouts")

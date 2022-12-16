@@ -79,7 +79,7 @@ def main():
     policy = torch.load("my_door_open_policy_1.pt")
     # evaluate the policy using the benchmark
     print("\n---Policy Evaluation---")
-    success_rate = benchmark.evaluate(
+    success_rate, gif = benchmark.evaluate(
         task_name=task,
         policy=policy,
         n_episodes=100,
