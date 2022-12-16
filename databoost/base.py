@@ -420,7 +420,7 @@ class DatasetGeneratorBase:
         ]
 
     def init_env(self, task_config: Dict) -> DataBoostEnvWrapper:
-        '''creates an Meta-WOrld environment according to the task specification
+        '''creates an environment according to the task specification
         and returns the initialized environment to be used for data collection.
 
         Args:
@@ -435,20 +435,79 @@ class DatasetGeneratorBase:
     def init_policy(self,
                     env: gym.Env,
                     task_config: Dict) -> DatasetGenerationPolicyBase:
+        '''Get an initialized policy for data generation purposes.
+
+        Args:
+            env [gym.Env]: the environment with which to generate data
+            task_config [Dict]: configs for the policy
+        Returns:
+            policy [DatasetGenerationPolicyBase]: expert policy to generate data
         '''
+        raise NotImplementedError
+
+    def get_max_traj_len(self, \
+                         env: gym.Env,
+                         task_config: Dict) -> int:
+        '''get the maximum allowed trajectory length for an episode
+
+        Args:
+            env [gym.Env]: the environment with which to generate data
+            task_config [Dict]: configs for the data generation process
+        Returns:
+            max_traj_len [int]: max trajectory length
         '''
         raise NotImplementedError
 
-    def get_max_traj_len(self, env, task_config):
+    def render_img(self, env) -> np.ndarray:
+        '''function to render an image of the environment (env-specific)
+
+        Args:
+            env [gym.Env]: the environment with which to generate data
+        Returns:
+            im [np.ndarray]: image of the environment
+        '''
         raise NotImplementedError
 
-    def render_img(self, env):
+    def is_success(self,
+                   env: gym.Env,
+                   ob: np.ndarray,
+                   rew: float,
+                   done: bool,
+                   info: Dict) -> bool:
+        '''Determine if the given env step marked a successful episode
+
+        Args:
+            env [gym.Env]: gym environment
+            ob [np.ndarray]: an observation of the environment this step
+            rew [float]: reward received for this env step
+            done [bool]: whether the trajectory has reached an end
+            info [Dict]: metadata of the environment step
+        Returns:
+            is_success [bool]: whether the episode was successful
+        '''
         raise NotImplementedError
 
-    def is_success(self, env, ob, rew, done, info):
-        raise NotImplementedError
+    def post_process_step(self,
+                          env: gym.Env,
+                          ob: np.ndarray,
+                          rew: float,
+                          done: bool,
+                          info: Dict) -> Tuple[np.ndarray, float, bool, Dict]:
+        '''Optional post-processing step to apply to each env step in the data
+        generation process
 
-    def post_process_step(self, env, ob, rew, done, info):
+        Args:
+            env [gym.Env]: gym environment
+            ob [np.ndarray]: an observation of the environment this step
+            rew [float]: reward received for this env step
+            done [bool]: whether the trajectory has reached an end
+            info [Dict]: metadata of the environment step
+        Returns:
+            ob [np.ndarray]: post-processed observation
+            rew [float]: post-processed reward
+            done [bool]: post-processed done flag
+            info [Dict]: post-processed info dict
+        '''
         return ob, rew, done, info
 
     def trajectory_generator(self,
@@ -484,10 +543,15 @@ class DatasetGeneratorBase:
             yield ob, act, rew, done, info, im
             ob = nxt_ob
 
-    def init_traj(self):
+    def init_traj(self) -> Dict:
+        '''Initialize an empty trajectory, preparing for data collection
+
+        Returns:
+            traj [Dict]: dict of empty attributes
+        '''
         traj = AttrDict()
         for attr in self.traj_keys:
-            traj[attr] = [] if attr != "infos" else {}
+            traj[attr] = [] if attr not in ("info", "infos") else {}
         return traj
 
     def add_to_traj(self,
@@ -499,6 +563,7 @@ class DatasetGeneratorBase:
         info: Dict,
         im: np.ndarray = None):
         '''helper function to append a step's results to a trajectory dictionary
+
         Args:
             traj [AttrDict]: dictionary with keys {
                 observations, actions, rewards, dones, infos, imgs}
@@ -520,8 +585,9 @@ class DatasetGeneratorBase:
         if im is not None:
             traj.imgs.append(im)
 
-    def traj_to_numpy(self, traj: AttrDict):
+    def traj_to_numpy(self, traj: AttrDict) -> AttrDict:
         '''convert trajectories attributes into numpy arrays
+    
         Args:
             traj [AttrDict]: dictionary with keys {obs, acts, rews, dones, infos, ims}
         Returns:
@@ -529,7 +595,7 @@ class DatasetGeneratorBase:
         '''
         traj_numpy = self.init_traj()
         for attr in traj:
-            if attr != "infos":
+            if attr not in ("info", "infos"):
                 traj_numpy[attr] = np.array(traj[attr])
             else:
                 for info_attr in traj.infos:
