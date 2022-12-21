@@ -84,15 +84,15 @@ if __name__ == "__main__":
         mask_reward = False
     )
 
-    # '''generate prior dataset'''
-    # prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
-    # prior_dataset_generator.generate_dataset(
-    #     tasks = {
-    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
-    #         if task_name in cfg.prior_tasks_list
-    #     },
-    #     dest_dir = cfg.prior_dataset_dir,
-    #     n_demos_per_task = cfg.prior_n_demos,
-    #     do_render = cfg.prior_do_render,
-    #     mask_reward = True
-    # )
+    '''generate prior dataset'''
+    prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
+    prior_dataset_generator.generate_dataset(
+        tasks = {
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.prior_tasks_list
+        },
+        dest_dir = cfg.prior_dataset_dir,
+        n_demos_per_task = cfg.prior_n_demos,
+        do_render = cfg.prior_do_render,
+        mask_reward = True
+    )
