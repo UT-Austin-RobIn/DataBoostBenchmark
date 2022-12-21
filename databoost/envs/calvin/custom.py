@@ -103,7 +103,7 @@ class CalvinEnv(PlayTableSimEnv):
             info.update(r_info)
             info.update(d_info)
             return obs, reward, done, info
-    
+
     def render(self, mode="rgb_array"):
         return super().render(mode=mode)
 

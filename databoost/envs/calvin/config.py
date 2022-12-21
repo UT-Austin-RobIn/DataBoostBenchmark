@@ -199,30 +199,25 @@ tasks = {
 }
 
 
-# '''Seed tasks configs'''
-# seed_tasks_list = [
-#     "assembly",
-#     "pick-place-wall",
-#     "door-open",
-#     "plate-slide-back-side"
-# ]
-# seed_dataset_dir = os.path.join(env_root, "data/seed")
-# seed_n_demos = 10
-# seed_do_render = True
-# seed_dataset_kwargs = AttrDict({
-#     "act_noise_pct": 0.1,
-#     "resolution": (224, 224),
-#     "camera": "corner"
-# })
+'''Seed tasks configs'''
+seed_tasks_list = [
+    "move_slider_left"
+]
+seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_n_demos = 10
+seed_do_render = True
+seed_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
+    "resolution": (224, 224)
+})
 
 
-# '''Prior tasks configs'''
-# prior_tasks_list = list(tasks.keys())
-# prior_dataset_dir = os.path.join(env_root, "data/prior")
-# prior_n_demos = 10
-# prior_do_render = True
-# prior_dataset_kwargs = AttrDict({
-#     "act_noise_pct": 0.1,
-#     "resolution": (224, 224),
-#     "camera": "corner"
-# })
+'''Prior tasks configs'''
+prior_tasks_list = list(tasks.keys())
+prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_n_demos = 10
+prior_do_render = True
+prior_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
+    "resolution": (224, 224),
+})

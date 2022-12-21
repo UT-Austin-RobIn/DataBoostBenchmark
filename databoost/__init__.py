@@ -1,12 +1,14 @@
 from databoost.base import DataBoostBenchmarkBase
 from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
+from databoost.envs.calvin import DataBoostBenchmarkCalvin
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 
 
 # dictionary of DataBoost's benchmark names and corresponding benchmark objects
 benchmarks = {
     "metaworld": DataBoostBenchmarkMetaworld,
-    "antmaze": DataBoostBenchmarkAntMaze
+    "antmaze": DataBoostBenchmarkAntMaze,
+    "calvin": DataBoostBenchmarkCalvin
 }
 
 
