@@ -142,17 +142,17 @@ if __name__=="__main__":
     
     # iterate through episode step files and build the episode trajectory
     curr_traj_id = 0
-    curr_skill_idx = 0
     traj_data = init_traj()
     for ep_step_path in tqdm(npz_files(data_dir)):
         # convert "path/to/dir/episode_0001234.npz" to 1234
         ep_id = int(os.path.splitext(os.path.split(ep_step_path)[-1].split("_")[-1])[0])
-        ep_step_data = np.load(ep_step_path)
         # identify the traj id, scene, skill
         traj_id = get_traj_id(ep_start_end_ids, ep_id)
         scene_id = get_scene_id(scene_intervals, ep_id)
         skill = get_skill(skill_data, ep_id)
+        curr_traj_id = traj_id
         # get step data
+        ep_step_data = np.load(ep_step_path)
         env.reset(robot_obs=ep_step_data["robot_obs"],
                   scene_obs=ep_step_data["scene_obs"])
         ob = np.concatenate([ep_step_data["robot_obs"],
