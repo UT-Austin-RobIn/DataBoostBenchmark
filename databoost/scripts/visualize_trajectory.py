@@ -44,7 +44,7 @@ def visualize_h5(path: str):
             fps,
             resolution
         )
-        for im in traj_data.front_cam_ob:
+        for im in traj_data.imgs:
             writer.write(im)
         writer.release()
 

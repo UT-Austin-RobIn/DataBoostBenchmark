@@ -37,8 +37,8 @@ class CalvinEnv(PlayTableSimEnv):
         self.tasks = hydra.utils.instantiate(cfg.tasks)
         self.task = task
 
-    def reset(self):
-        obs = super().reset()
+    def reset(self, *args, **kwargs):
+        obs = super().reset(*args, **kwargs)
         self.start_info = self.get_info()
         return obs
 

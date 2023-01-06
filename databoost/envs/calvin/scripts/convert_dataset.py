@@ -5,6 +5,7 @@ from typing import Dict
 from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
+from databoost.utils.data import write_h5
 from databoost.envs.calvin.utils import render
 from databoost.envs.calvin.custom import CalvinEnv
 
@@ -113,16 +114,16 @@ def get_skill(skill_data, ep_id):
                 return get_skill_recur(skill_data, mid + 1, high, ep_id)
         else:
             # Element is not present in the array
-            return None
+            return "None"
     return get_skill_recur(skill_data, 0, len(skill_data)-1, ep_id)
 
 
 if __name__=="__main__":
-    env = CalvinEnv("")  # set to empty task, just for rendering purposes
+    DEST_DIR = "/data/jullian-yapeter/DataBoostBenchmark/calvin/data/prior"
 
     # load in episode interval and skill info
     data_root = "/data/lucys/skill/calvin/dataset/task_ABCD_A"
-    phase = "validation"
+    phase = "training"
     data_dir = os.path.join(data_root, phase)
     scene_intervals = np.load(os.path.join(data_root,
                                            "training/scene_info.npy"),
@@ -138,28 +139,43 @@ if __name__=="__main__":
     skill_strings = skill_data["language"]["task"]
     skill_intervals = skill_data["info"]["indx"]
     skill_data = [(*interval, skill) for interval, skill in zip(skill_intervals, skill_strings)]
+    # skill_data is a sorted list of tuples (start_idx, end_idx, skill_string)
     skill_data = sorted(skill_data)
-    
+
     # iterate through episode step files and build the episode trajectory
-    curr_traj_id = 0
     traj_data = init_traj()
-    for ep_step_path in tqdm(npz_files(data_dir)):
+    data_files = npz_files(data_dir)
+    curr_ep_id = int(os.path.splitext(os.path.split(data_files[0])[-1].split("_")[-1])[0])
+    curr_traj_id = get_traj_id(ep_start_end_ids, curr_ep_id)
+    curr_scene_id = get_scene_id(scene_intervals, curr_ep_id)
+    # env = CalvinEnv("", scene=curr_scene_id)  # set to empty task, just for rendering purposes
+    for ep_step_path in tqdm(data_files):
         # convert "path/to/dir/episode_0001234.npz" to 1234
         ep_id = int(os.path.splitext(os.path.split(ep_step_path)[-1].split("_")[-1])[0])
         # identify the traj id, scene, skill
         traj_id = get_traj_id(ep_start_end_ids, ep_id)
         scene_id = get_scene_id(scene_intervals, ep_id)
         skill = get_skill(skill_data, ep_id)
-        curr_traj_id = traj_id
+        # write current trajectory when transition to next trajectory detected
+        if traj_id != curr_traj_id:
+            traj_numpy = traj_to_numpy(traj_data)
+            write_h5(traj_numpy, os.path.join(DEST_DIR, f"traj_{phase}_{curr_traj_id}.h5"))
+            curr_traj_id = traj_id
+            traj_data = init_traj()
+            # env = CalvinEnv("", scene=scene_id)
         # get step data
         ep_step_data = np.load(ep_step_path)
-        env.reset(robot_obs=ep_step_data["robot_obs"],
-                  scene_obs=ep_step_data["scene_obs"])
+        # env.reset(robot_obs=ep_step_data["robot_obs"],
+        #           scene_obs=ep_step_data["scene_obs"])
         ob = np.concatenate([ep_step_data["robot_obs"],
                              ep_step_data["scene_obs"]])
-        im = render(env)
+        # im = render(env)
         act = ep_step_data["rel_actions"]
         rew = 0
         done = 0
-        _, _, _, info = env.step(act)
-        add_to_traj(traj_data, act, rew, done, info, im)
+        # _, _, _, info = env.step(act)
+        info = {"scene": scene_id.encode("utf-8"), "skill": skill.encode("utf-8")}
+        add_to_traj(traj_data, ob, act, rew, done, info, None)
+    # write the last trajectory
+    traj_numpy = traj_to_numpy(traj_data)
+    write_h5(traj_numpy, os.path.join(DEST_DIR, f"traj_{curr_traj_id}.h5"))

@@ -57,7 +57,7 @@ def train(policy: nn.Module,
             optimizer.step()
         print(f"epoch {epoch}: loss = {np.mean(losses)}")
         wandb.log({"epoch": epoch, "loss": np.mean(losses)})
-        if epoch % eval_period == 0:
+        if epoch % eval_period == -1:
             print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
             success_rate, _ = benchmark.evaluate(
                 task_name=task_name,
@@ -71,7 +71,6 @@ def train(policy: nn.Module,
             if success_rate >= best_success_rate:
                 torch.save(policy, os.path.join(dest_dir, f"{exp_name}-best.pt"))
                 best_success_rate = success_rate
-            
     return policy
 
 if __name__ == "__main__":
@@ -88,21 +87,23 @@ if __name__ == "__main__":
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = args.boosting_method
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-1"
+    boosting_method = "seed"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_test"
     dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+    goal_condition = True
 
     dataloader_configs = {
-        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",
-        "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/boosted_data/{task_name}/{boosting_method}",
+        "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",
+        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/boosted_data/{task_name}/{boosting_method}",
         "n_demos": None,
         "batch_size": 64,
         "seq_len": 1,
-        "shuffle": True
+        "shuffle": True,
+        "goal_condition": goal_condition
     }
 
     policy_configs = {
-        "obs_dim": 39,
+        "obs_dim": 39 * (2 if goal_condition else 1),
         "action_dim": 4,
         "hidden_dim": 512,
         "n_hidden_layers": 4,

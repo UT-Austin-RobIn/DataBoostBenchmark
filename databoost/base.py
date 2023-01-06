@@ -72,7 +72,8 @@ class DataBoostEnvWrapper(gym.Wrapper):
                         n_demos: int = None,
                         seq_len: int = None,
                         batch_size: int = 1,
-                        shuffle: bool = True) -> DataLoader:
+                        shuffle: bool = True,
+                        goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader to load in h5 data from the given dataset_dir.
 
         Args:
@@ -85,7 +86,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         Returns:
             dataloader [DataLoader]: DataLoader for given dataset directory
         '''
-        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len)
+        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, goal_condition)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_seed_dataset(self, n_demos: int = None) -> Dataset:
@@ -112,7 +113,8 @@ class DataBoostEnvWrapper(gym.Wrapper):
                             n_demos: int = None,
                             seq_len: int = None,
                             batch_size: int = 1,
-                            shuffle: bool = True) -> DataLoader:
+                            shuffle: bool = True,
+                            goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader for this benchmark's seed dataset.
 
         Args:
@@ -129,13 +131,15 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     n_demos=n_demos,
                                     seq_len=seq_len,
                                     batch_size=batch_size,
-                                    shuffle=shuffle)
+                                    shuffle=shuffle,
+                                    goal_condition=goal_condition)
 
     def get_prior_dataloader(self,
                              n_demos: int = None,
                              seq_len: int = None,
                              batch_size: int = 1,
-                             shuffle: bool = True) -> DataLoader:
+                             shuffle: bool = True,
+                             goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader for this benchmark's prior dataset.
 
         Args:
@@ -152,7 +156,8 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     n_demos=n_demos,
                                     seq_len=seq_len,
                                     batch_size=batch_size,
-                                    shuffle=shuffle)
+                                    shuffle=shuffle,
+                                    goal_condition=goal_condition)
 
     def default_render(self) -> np.ndarray:
         '''standard API to wrap environment-specific render function with
@@ -239,6 +244,13 @@ class DataBoostBenchmarkBase:
         for episode in tqdm(range(int(n_episodes))):
             if render: gif = []
             ob = env.reset()
+            # '''Get goal frame'''
+            # temp_env = self.get_env(task_name)
+            # temp_env.set_goal_(env.goal)
+            # temp_env.reset()
+            # temp_env.set_env_state(env.get_env_state())
+            # # solve temp env
+            # ''''''
             if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
             for _ in range(max_traj_len - 1):
                 with torch.no_grad():
@@ -264,7 +276,8 @@ class DataBoostDataset(Dataset):
     def __init__(self,
                  dataset_dir: str,
                  n_demos: int = None,
-                 seq_len: int = None):
+                 seq_len: int = None,
+                 goal_condition: bool = False):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
         Will return AttrDict object where each attribute is of shape:
@@ -293,9 +306,10 @@ class DataBoostDataset(Dataset):
         '''
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
+        self.goal_condition = goal_condition
         file_paths = find_h5(dataset_dir)
-        if n_demos is None: n_demos = len(file_paths)
         if self.seq_len is None:
+            if n_demos is None: n_demos = len(file_paths)
             # if no seq_len is given, no need to proceed with slicing.
             # use whole trajectories.
             assert len(file_paths) >= n_demos, \
@@ -319,17 +333,23 @@ class DataBoostDataset(Dataset):
                 self.paths.append(file_path)
         print(f"{len(self.paths)}/{len(file_paths)} trajectories "
               "are of sufficient length")
+        if n_demos is None: n_demos = len(self.paths)
         assert len(self.paths) >= n_demos, \
                 f"given n_demos too large. Max is {len(self.paths)}"
         self.paths = random.sample(self.paths, n_demos)
 
         self.slices = []
+        if self.goal_condition: self.pretrain_goals = []  # actionable models style random goals (~200 steps ahead)
         for path_id, path in enumerate(self.paths):
             traj_data = read_h5(path)
             traj_len = self.get_traj_len(traj_data)
             start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
             traj_slices = [(path_id, *start_end_idx) for start_end_idx in start_end_idxs]
             self.slices += traj_slices
+            if self.goal_condition:
+                max_goal_idxs = [min(traj_len - 1, start_end_idx[-1] + 200) for start_end_idx in start_end_idxs]
+                min_goal_idxs = [max(max_goal_idx - 10, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
+                self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
 
     def __len__(self) -> int:
@@ -345,7 +365,7 @@ class DataBoostDataset(Dataset):
         '''get item from the dataset; a dictionary of trajectory data.
 
         Args:
-            idx [int]: index of h5 file
+            idx [int]: index of slice
         Returns:
             traj_seq [dict]: dictionary of trajectory data, sliced to a random
                              subsequence of specified seq_len; or use whole
@@ -357,6 +377,11 @@ class DataBoostDataset(Dataset):
             return traj_data
         traj_len = self.get_traj_len(traj_data)
         traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
+        if self.goal_condition:
+            _, goal_max_idx = self.pretrain_goals[idx]
+            # goal_idx = random.randint(goal_min_idx, goal_max_idx)
+            goal_frame = get_traj_slice(traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
+            traj_seq["observations"] = np.concatenate((traj_seq["observations"], goal_frame["observations"]), axis=-1)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
@@ -487,6 +512,12 @@ class DatasetGeneratorBase:
         '''
         raise NotImplementedError
 
+    def get_env_state(self, env):
+        '''get state of env such that we can reset to this exact state.
+        Complement of load_env_state.
+        '''
+        raise NotImplementedError
+
     def post_process_step(self,
                           env: gym.Env,
                           ob: np.ndarray,
@@ -512,12 +543,14 @@ class DatasetGeneratorBase:
 
     def trajectory_generator(self,
         env: gym.Env,
+        ob: np.ndarray,
         policy: DatasetGenerationPolicyBase,
         task_config,
         do_render: bool = True):
         '''Generates MujocoEnv trajectories given a policy.
         Args:
             env [MujocoEnv]: Meta-world's MujocoEnv
+            ob: [np.ndarray]: starting observation
             policy [Policy]: policy that returns an action given an
                                 observation, with a get_action call
             do_render [bool]: if true, render images and store it as part of the
@@ -533,7 +566,6 @@ class DatasetGeneratorBase:
             )
         '''
         task_config = copy.deepcopy(task_config)
-        ob = env.reset()
         for _ in range(self.get_max_traj_len(env, task_config)):
             act = policy.get_action(ob)
             nxt_ob, rew, done, info = env.step(act)
@@ -630,7 +662,9 @@ class DatasetGeneratorBase:
             while num_success < n_demos_per_task:
                 traj = self.init_traj()
                 # generate trajectories using expert policy
-                for ob, act, rew, done, info, im in self.trajectory_generator(env, policy, task_config, do_render):
+                ob = env.reset()
+                starting_state = self.get_env_state(env)
+                for ob, act, rew, done, info, im in self.trajectory_generator(env, ob, policy, task_config, do_render):
                     if mask_reward: rew = 0.0
                     ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
@@ -639,6 +673,9 @@ class DatasetGeneratorBase:
                         traj = self.traj_to_numpy(traj)
                         filename = f"{task_name}_{num_success}.h5"
                         write_h5(traj, os.path.join(task_dir, filename))
+                        start_state_filename = f"{task_name}_{num_success}.pkl"
+                        with open(os.path.join(task_dir, start_state_filename), "wb") as f:
+                            pickle.dump(starting_state, f)
                         break
                 num_tries += 1
                 print(f"generating {task_name} demos: {num_success}/{num_tries}")

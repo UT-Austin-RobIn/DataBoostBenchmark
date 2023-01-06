@@ -17,13 +17,28 @@ def initialize_env(env: MujocoEnv) -> MujocoEnv:
     return env
 
 
-def render(env, **kwargs):
+def render(env, kwargs):
     camera = kwargs["camera"] if "camera" in kwargs else "corner"
     resolution = kwargs["resolution"] if "resolution" in kwargs else (224, 224)
     im = env.render(
         camera_name=camera,
-        resolution=resolution,
-        offscreen=True)[:, :, ::-1]
+        resolution=resolution)[:, :, ::-1]
+        # offscreen=True)[:, :, ::-1]
     if camera == "behindGripper":  # this view requires a 180 rotation
         im = cv2.rotate(im, cv2.ROTATE_180)
     return im
+
+
+def get_env_state(env):
+    '''Meta-World state is tuple of (state, goal)
+    '''
+    return (env.get_env_state(), env.goal)
+
+
+def load_env_state(env, state):
+    '''Load state based on state obtained using get_env_state()
+    '''
+    env.set_goal_(state[-1])
+    env.reset()
+    env.set_env_state(state[0])
+    return env

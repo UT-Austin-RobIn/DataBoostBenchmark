@@ -8,7 +8,7 @@ from databoost.base import \
     DataBoostEnvWrapper, DatasetGenerationPolicyBase, DatasetGeneratorBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 import databoost.envs.metaworld.config as cfg
-from databoost.envs.metaworld.utils import render
+from databoost.envs.metaworld.utils import render, get_env_state
 
 
 class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
@@ -68,6 +68,9 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         })
         done = info['success']
         return ob, rew, done, info
+    
+    def get_env_state(self, env):
+        return get_env_state(env)
 
 
 if __name__ == "__main__":
@@ -84,15 +87,15 @@ if __name__ == "__main__":
         mask_reward = False
     )
 
-    '''generate prior dataset'''
-    prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
-    prior_dataset_generator.generate_dataset(
-        tasks = {
-            task_name: task_config for task_name, task_config in cfg.tasks.items()
-            if task_name in cfg.prior_tasks_list
-        },
-        dest_dir = cfg.prior_dataset_dir,
-        n_demos_per_task = cfg.prior_n_demos,
-        do_render = cfg.prior_do_render,
-        mask_reward = True
-    )
+    # '''generate prior dataset'''
+    # prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
+    # prior_dataset_generator.generate_dataset(
+    #     tasks = {
+    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
+    #         if task_name in cfg.prior_tasks_list
+    #     },
+    #     dest_dir = cfg.prior_dataset_dir,
+    #     n_demos_per_task = cfg.prior_n_demos,
+    #     do_render = cfg.prior_do_render,
+    #     mask_reward = True
+    # )
