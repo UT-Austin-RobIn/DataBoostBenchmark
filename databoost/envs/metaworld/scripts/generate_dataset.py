@@ -55,7 +55,7 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         return env.max_path_length
 
     def render_img(self, env):
-        im = render(env, self.dataset_kwargs)
+        im = render(env, **self.dataset_kwargs)
         return im
 
     def is_success(self, env, ob, rew, done, info):

@@ -567,11 +567,11 @@ class DatasetGeneratorBase:
         '''
         task_config = copy.deepcopy(task_config)
         for _ in range(self.get_max_traj_len(env, task_config)):
-            act = policy.get_action(ob)
-            nxt_ob, rew, done, info = env.step(act)
             im = None
             if do_render:
                 im = self.render_img(env)
+            act = policy.get_action(ob)
+            nxt_ob, rew, done, info = env.step(act)
             yield ob, act, rew, done, info, im
             ob = nxt_ob
 
@@ -663,7 +663,9 @@ class DatasetGeneratorBase:
                 traj = self.init_traj()
                 # generate trajectories using expert policy
                 ob = env.reset()
-                starting_state = self.get_env_state(env)
+                # env_state = env.__getstate__()
+                # starting_state = self.get_env_state(env)
+                env_copy = copy.deepcopy(env)
                 for ob, act, rew, done, info, im in self.trajectory_generator(env, ob, policy, task_config, do_render):
                     if mask_reward: rew = 0.0
                     ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
@@ -671,11 +673,12 @@ class DatasetGeneratorBase:
                     if self.is_success(env, ob, rew, done, info):
                         num_success += 1
                         traj = self.traj_to_numpy(traj)
-                        filename = f"{task_name}_{num_success}.h5"
-                        write_h5(traj, os.path.join(task_dir, filename))
-                        start_state_filename = f"{task_name}_{num_success}.pkl"
-                        with open(os.path.join(task_dir, start_state_filename), "wb") as f:
-                            pickle.dump(starting_state, f)
+                        filename = f"{task_name}_{num_success}"
+                        write_h5(traj, os.path.join(task_dir, filename + ".h5"))
+                        with open(os.path.join(task_dir, filename + "_goal.pkl"), "wb") as f:
+                            goal_obs = traj.observations[-1]
+                            goal_img = traj.imgs[-1]
+                            pickle.dump((env_copy, goal_obs, goal_img), f)
                         break
                 num_tries += 1
                 print(f"generating {task_name} demos: {num_success}/{num_tries}")
