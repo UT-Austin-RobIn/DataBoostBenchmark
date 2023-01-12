@@ -107,3 +107,12 @@ class MultivariateGaussian(Gaussian):
     @staticmethod
     def cat(*argv, dim):
         return MultivariateGaussian(Gaussian.cat(*argv, dim=dim).tensor())
+
+
+def compute_batched(f, xs):
+    return f(torch.cat(xs, dim=0)).split([len(x) for x in xs])
+
+
+def update_exponential_moving_average(target, source, alpha):
+    for target_param, source_param in zip(target.parameters(), source.parameters()):
+        target_param.data.mul_(1. - alpha).add_(source_param.data, alpha=alpha)

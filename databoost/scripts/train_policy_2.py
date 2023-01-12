@@ -31,7 +31,6 @@ def train(policy: nn.Module,
           goal_condition: bool = False):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(device)
     policy = policy.train().to(device)
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
     best_success_rate = 0
@@ -83,10 +82,10 @@ if __name__ == "__main__":
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
     boosting_method = "all"
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond-4"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-no_goal_cond-4"
     # dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
     dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/all"
-    goal_condition = True
+    goal_condition = False
 
     dataloader_configs = {
         # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",

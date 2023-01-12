@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
+    find_pkl,
     find_h5, read_h5, write_h5,
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
@@ -42,11 +43,13 @@ class DataBoostEnvWrapper(gym.Wrapper):
                  env: gym.Env,
                  prior_dataset_url: str,
                  seed_dataset_url: str,
-                 render_func: Callable):
+                 render_func: Callable,
+                 test_dataset_url: str = None):
         super().__init__(env)
         self.env = env
         self.prior_dataset_url = prior_dataset_url
         self.seed_dataset_url = seed_dataset_url
+        self.test_dataset_url = test_dataset_url
         self.render_func = render_func
 
     def _get_dataset(self, dataset_dir: str, n_demos: int = None) -> AttrDict:
@@ -169,6 +172,19 @@ class DataBoostEnvWrapper(gym.Wrapper):
         im = self.render_func(self.env)
         return im
 
+    def load_test_env(self):
+        '''To load saved goal condition test env
+        '''
+        if self.test_dataset_url is None:
+            raise ValueError("this env does not have a corresponding test set")
+        test_pkl_files = find_pkl(self.test_dataset_url)
+        test_pkl_file = random.choice(test_pkl_files)
+        with open(test_pkl_file, "rb") as f:
+            test_env_dict = pickle.load(f)
+        self.env = test_env_dict["env"]
+        test_env_dict.pop("env")
+        return test_env_dict
+
 
 class DataBoostBenchmarkBase:
     def __init__(self):
@@ -221,6 +237,7 @@ class DataBoostBenchmarkBase:
                  policy: nn.Module,
                  n_episodes: int,
                  max_traj_len: int,
+                 goal_cond: bool = False,
                  render: bool = False) -> Tuple[float, np.ndarray]:
         '''Evaluates the performance of a given policy on the specified task.
 
@@ -243,17 +260,17 @@ class DataBoostBenchmarkBase:
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
             if render: gif = []
-            ob = env.reset()
-            # '''Get goal frame'''
-            # temp_env = self.get_env(task_name)
-            # temp_env.set_goal_(env.goal)
-            # temp_env.reset()
-            # temp_env.set_env_state(env.get_env_state())
-            # # solve temp env
-            # ''''''
+            if not goal_cond:
+                ob = env.reset()
+            else:
+                test_env_dict = env.load_test_env()
+                ob = test_env_dict["starting_ob"]
+                goal_ob = test_env_dict["goal_ob"]
+                goal_im = test_env_dict["goal_im"]
             if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
             for _ in range(max_traj_len - 1):
                 with torch.no_grad():
+                    if goal_cond: ob = np.concatenate((ob, goal_ob), axis = -1)
                     act = policy.get_action(ob)
                 ob, rew, done, info = env.step(act)
                 if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
@@ -304,6 +321,7 @@ class DataBoostDataset(Dataset):
             paths [List[str]]: list of h5 file paths to load in
             slices [List[Tuple[int]]]: list of tuples (path, start_idx, end_idx)
         '''
+        self.limited_data_cache = {}
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         self.goal_condition = goal_condition
@@ -347,8 +365,17 @@ class DataBoostDataset(Dataset):
             traj_slices = [(path_id, *start_end_idx) for start_end_idx in start_end_idxs]
             self.slices += traj_slices
             if self.goal_condition:
-                max_goal_idxs = [min(traj_len - 1, start_end_idx[-1] + 200) for start_end_idx in start_end_idxs]
-                min_goal_idxs = [max(max_goal_idx - 10, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
+                '''Meta-World traj lengths
+                avg_len: 82
+                max_len: 489
+                min_len: 19
+                std: 41.827702351432116
+                choose 200
+                '''
+                max_goal_idxs = [
+                    min(traj_len - 1, start_end_idx[-1] + 200) for start_end_idx in start_end_idxs]
+                min_goal_idxs = [
+                    max(max_goal_idx - 10, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
                 self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
 
@@ -372,7 +399,13 @@ class DataBoostDataset(Dataset):
                              trajectory if seq_len was not specified
         '''
         path_id, start_idx, end_idx = self.slices[idx]
-        traj_data = read_h5(self.paths[path_id])
+        if path_id in self.limited_data_cache:
+            traj_data = self.limited_data_cache[path_id]
+        else:
+            traj_data = read_h5(self.paths[path_id])
+            if len(self.limited_data_cache) > 600:
+                self.limited_data_cache.pop(list(self.limited_data_cache.keys())[0])
+            self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
             return traj_data
         traj_len = self.get_traj_len(traj_data)
@@ -380,8 +413,11 @@ class DataBoostDataset(Dataset):
         if self.goal_condition:
             _, goal_max_idx = self.pretrain_goals[idx]
             # goal_idx = random.randint(goal_min_idx, goal_max_idx)
-            goal_frame = get_traj_slice(traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
-            traj_seq["observations"] = np.concatenate((traj_seq["observations"], goal_frame["observations"]), axis=-1)
+            goal_frame = get_traj_slice(
+                traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
+            n_repeats = traj_seq["observations"].shape[-2]  # the seq_len axis
+            traj_seq["observations"] = np.concatenate(
+                (traj_seq["observations"], np.repeat(goal_frame["observations"], n_repeats, axis=-2)), axis=-1)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
@@ -639,7 +675,8 @@ class DatasetGeneratorBase:
         dest_dir: str,
         n_demos_per_task: int,
         mask_reward: bool,
-        do_render: bool = True):
+        do_render: bool = True,
+        save_env_and_goal: bool = False):
         '''generates a dataset given a list of tasks and other configs.
 
         Args:
@@ -663,22 +700,33 @@ class DatasetGeneratorBase:
                 traj = self.init_traj()
                 # generate trajectories using expert policy
                 ob = env.reset()
-                # env_state = env.__getstate__()
-                # starting_state = self.get_env_state(env)
-                env_copy = copy.deepcopy(env)
-                for ob, act, rew, done, info, im in self.trajectory_generator(env, ob, policy, task_config, do_render):
+                if save_env_and_goal:
+                    starting_ob = copy.deepcopy(ob)
+                    env_copy = copy.deepcopy(env)
+                for ob, act, rew, done, info, im in self.trajectory_generator(
+                        env, ob, policy, task_config, do_render):
                     if mask_reward: rew = 0.0
-                    ob, rew, done, info = self.post_process_step(env, ob, rew, done, info)
+                    ob, rew, done, info = self.post_process_step(
+                        env, ob, rew, done, info)
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
+                    # if len(traj["observations"]) > 300 and not self.is_success(env, ob, rew, done, info):
                     if self.is_success(env, ob, rew, done, info):
                         num_success += 1
                         traj = self.traj_to_numpy(traj)
                         filename = f"{task_name}_{num_success}"
                         write_h5(traj, os.path.join(task_dir, filename + ".h5"))
-                        with open(os.path.join(task_dir, filename + "_goal.pkl"), "wb") as f:
-                            goal_obs = traj.observations[-1]
-                            goal_img = traj.imgs[-1]
-                            pickle.dump((env_copy, goal_obs, goal_img), f)
+                        # write_h5(traj, os.path.join(task_dir, filename + "_fail.h5"))
+                        if save_env_and_goal:
+                            with open(os.path.join(
+                                task_dir, filename + ".pkl"), "wb") as f:
+                                goal_ob = traj.observations[-1]
+                                goal_im = traj.imgs[-1]
+                                pickle.dump({
+                                    "env": env_copy,
+                                    "starting_ob": starting_ob,
+                                    "goal_ob": goal_ob,
+                                    "goal_im": goal_im
+                                }, f)
                         break
                 num_tries += 1
                 print(f"generating {task_name} demos: {num_success}/{num_tries}")

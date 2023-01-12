@@ -38,6 +38,7 @@ class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
                 initialize_env(task_cfg.env()),
                 seed_dataset_url=task_cfg.seed_dataset,
                 prior_dataset_url=cfg.prior_dataset_dir,
+                test_dataset_url=task_cfg.test_dataset if "test_dataset" in task_cfg else None,
                 render_func=render,
             )
         return env

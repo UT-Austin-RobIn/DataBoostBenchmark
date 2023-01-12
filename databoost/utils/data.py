@@ -10,6 +10,23 @@ import torch
 from databoost.utils.general import AttrDict
 
 
+def find_pkl(dir: str) -> List[str]:
+    '''Get list of pkl file paths.
+
+    Args:
+        dir [str]: path to directory of interest
+    Returns:
+        file_paths [List[str]]: sorted list of pkl file paths within dir
+    '''
+    file_paths = []
+    for root, _, files in os.walk(dir):
+        for file in files:
+            if file.endswith((".pkl")):
+                file_paths.append(os.path.join(root, file))
+    file_paths.sort()
+    return file_paths
+
+
 def find_h5(dir: str) -> List[str]:
     '''Get list of h5 file paths.
 
@@ -173,3 +190,12 @@ def get_traj_slice(traj_data: Dict,
                 # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
                 traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
         return traj_seq
+
+
+def dump_video_wandb(vid, tag, entity=None, project=None, fps=20):
+    assert len(vid.shape) == 4 and vid.shape[1] == 3
+    if vid.max() <= 1.0:
+        vid = np.asarray(vid * 255.0, dtype=np.uint8)
+    if entity is not None and project is not None:
+        init_wandb(entity, project)
+    wandb.log({tag: [wandb.Video(vid, fps=fps, format="mp4")]})

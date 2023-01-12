@@ -84,6 +84,7 @@ if __name__ == "__main__":
         dest_dir = cfg.seed_dataset_dir,
         n_demos_per_task = cfg.seed_n_demos,
         do_render = cfg.seed_do_render,
+        save_env_and_goal = cfg.seed_save_env_and_goal,
         mask_reward = False
     )
 
@@ -97,5 +98,20 @@ if __name__ == "__main__":
     #     dest_dir = cfg.prior_dataset_dir,
     #     n_demos_per_task = cfg.prior_n_demos,
     #     do_render = cfg.prior_do_render,
+    #     save_env_and_goal = cfg.prior_save_env_and_goal,
     #     mask_reward = True
+    # )
+
+    # '''generate test dataset'''
+    # test_dataset_generator = DatasetGeneratorMetaworld(**cfg.test_dataset_kwargs)
+    # test_dataset_generator.generate_dataset(
+    #     tasks = {
+    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
+    #         if task_name in cfg.test_tasks_list
+    #     },
+    #     dest_dir = cfg.test_dataset_dir,
+    #     n_demos_per_task = cfg.test_n_demos,
+    #     do_render = cfg.test_do_render,
+    #     save_env_and_goal = cfg.test_save_env_and_goal,
+    #     mask_reward = False
     # )

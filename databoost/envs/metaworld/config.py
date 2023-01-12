@@ -13,11 +13,40 @@ env_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld"
 
 '''Tasks configs'''
 tasks = {
+    "assembly": AttrDict({
+        "task_name": "assembly",
+        "env": ALL_V2_ENVS["assembly-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
+        "test_dataset": os.path.join(env_root, "test/assembly"),
+        "expert_policy": policies.SawyerAssemblyV2Policy,
+    }),
+    "pick-place-wall": AttrDict({
+        "task_name": "pick-place-wall",
+        "env": ALL_V2_ENVS["pick-place-wall-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
+        "test_dataset": os.path.join(env_root, "test/pick-place-wall"),
+        "expert_policy": policies.SawyerPickPlaceWallV2Policy,
+    }),
     "door-open": AttrDict({
         "task_name": "door-open",
         "env": ALL_V2_ENVS["door-open-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/door-open"),
+        "test_dataset": os.path.join(env_root, "test/door-open"),
         "expert_policy": policies.SawyerDoorOpenV2Policy,
+    }),
+    "plate-slide-back-side": AttrDict({
+        "task_name": "plate-slide-back-side",
+        "env": ALL_V2_ENVS["plate-slide-back-side-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back-side"),
+        "test_dataset": os.path.join(env_root, "test/plate-slide-back-side"),
+        "expert_policy": policies.SawyerPlateSlideBackSideV2Policy,
+    }),
+    "plate-slide-side": AttrDict({
+        "task_name": "plate-slide-side",
+        "env": ALL_V2_ENVS["plate-slide-side-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-side"),
+        "test_dataset": os.path.join(env_root, "test/plate-slide-side"),
+        "expert_policy": policies.SawyerPlateSlideSideV2Policy,
     }),
     "door-close": AttrDict({
         "task_name": "door-close",
@@ -36,12 +65,6 @@ tasks = {
         "env": ALL_V2_ENVS["door-unlock-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/door-unlock"),
         "expert_policy": policies.SawyerDoorUnlockV2Policy,
-    }),
-    "assembly": AttrDict({
-        "task_name": "assembly",
-        "env": ALL_V2_ENVS["assembly-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
-        "expert_policy": policies.SawyerAssemblyV2Policy,
     }),
     "basketball": AttrDict({
         "task_name": "basketball",
@@ -187,12 +210,6 @@ tasks = {
         "seed_dataset": os.path.join(env_root, "data/seed/peg-insert-side"),
         "expert_policy": policies.SawyerPegInsertionSideV2Policy,
     }),
-    "pick-place-wall": AttrDict({
-        "task_name": "pick-place-wall",
-        "env": ALL_V2_ENVS["pick-place-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
-        "expert_policy": policies.SawyerPickPlaceWallV2Policy,
-    }),
     "pick-out-of-hole": AttrDict({
         "task_name": "pick-out-of-hole",
         "env": ALL_V2_ENVS["pick-out-of-hole-v2"],
@@ -229,23 +246,11 @@ tasks = {
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide"),
         "expert_policy": policies.SawyerPlateSlideV2Policy,
     }),
-    "plate-slide-side": AttrDict({
-        "task_name": "plate-slide-side",
-        "env": ALL_V2_ENVS["plate-slide-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-side"),
-        "expert_policy": policies.SawyerPlateSlideSideV2Policy,
-    }),
     "plate-slide-back": AttrDict({
         "task_name": "plate-slide-back",
         "env": ALL_V2_ENVS["plate-slide-back-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back"),
         "expert_policy": policies.SawyerPlateSlideBackV2Policy,
-    }),
-    "plate-slide-back-side": AttrDict({
-        "task_name": "plate-slide-back-side",
-        "env": ALL_V2_ENVS["plate-slide-back-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back-side"),
-        "expert_policy": policies.SawyerPlateSlideBackSideV2Policy,
     }),
     "peg-unplug-side": AttrDict({
         "task_name": "peg-unplug-side",
@@ -321,11 +326,13 @@ seed_tasks_list = [
     "assembly",
     "pick-place-wall",
     "door-open",
-    "plate-slide-back-side"
+    "plate-slide-back-side",
+    "plate-slide-side"
 ]
-seed_dataset_dir = os.path.join(env_root, "data/seed")
-seed_n_demos = 10
+seed_dataset_dir = os.path.join(env_root, "data/expanded_seed")
+seed_n_demos = 50
 seed_do_render = True
+seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
     "resolution": (224, 224),
@@ -338,7 +345,27 @@ prior_tasks_list = list(tasks.keys())
 prior_dataset_dir = os.path.join(env_root, "data/prior")
 prior_n_demos = 10
 prior_do_render = True
+prior_save_env_and_goal = False
 prior_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
+    "resolution": (224, 224),
+    "camera": "corner"
+})
+
+
+'''Test tasks configs'''
+test_tasks_list = [
+    "assembly",
+    "pick-place-wall",
+    "door-open",
+    "plate-slide-back-side",
+    "plate-slide-side"
+]
+test_dataset_dir = os.path.join(env_root, "test")
+test_n_demos = 100
+test_do_render = True
+test_save_env_and_goal = True
+test_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
