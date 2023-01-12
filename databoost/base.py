@@ -60,7 +60,12 @@ class DataBoostEnvWrapper(gym.Wrapper):
         Returns:
             trajs [AttrDict]: dataset as an AttrDict
         '''
-        dataset_files = find_h5(dataset_dir)
+        if type(dataset_dir) in (list, tuple):
+            dataset_files = []
+            for cur_dataset_dir in dataset_dir:
+                dataset_files += find_h5(cur_dataset_dir)
+        else:
+            dataset_files = find_h5(dataset_dir)
         # if n_demos not specified, use all h5 files in the given dataset dir
         if n_demos is None: n_demos = len(dataset_files)
         assert len(dataset_files) >= n_demos, \
@@ -325,7 +330,12 @@ class DataBoostDataset(Dataset):
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         self.goal_condition = goal_condition
-        file_paths = find_h5(dataset_dir)
+        if type(dataset_dir) in (list, tuple):
+            file_paths = []
+            for cur_dataset_dir in dataset_dir:
+                file_paths += find_h5(cur_dataset_dir)
+        else:
+            file_paths = find_h5(dataset_dir)
         if self.seq_len is None:
             if n_demos is None: n_demos = len(file_paths)
             # if no seq_len is given, no need to proceed with slicing.
@@ -343,12 +353,16 @@ class DataBoostDataset(Dataset):
             return
 
         self.paths = []
+        self.path_lens = {}
         # filter for files that are long enough
-        for file_path in file_paths:
+        print("filtering files of sufficient length")
+        for file_path in tqdm(file_paths):
             traj_data = read_h5(file_path)
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
                 self.paths.append(file_path)
+                self.limited_data_cache[file_path] = traj_data  # temp, for speed
+                self.path_lens[file_path] = traj_len
         print(f"{len(self.paths)}/{len(file_paths)} trajectories "
               "are of sufficient length")
         if n_demos is None: n_demos = len(self.paths)
@@ -359,8 +373,7 @@ class DataBoostDataset(Dataset):
         self.slices = []
         if self.goal_condition: self.pretrain_goals = []  # actionable models style random goals (~200 steps ahead)
         for path_id, path in enumerate(self.paths):
-            traj_data = read_h5(path)
-            traj_len = self.get_traj_len(traj_data)
+            traj_len = self.path_lens[path]
             start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
             traj_slices = [(path_id, *start_end_idx) for start_end_idx in start_end_idxs]
             self.slices += traj_slices
@@ -399,25 +412,26 @@ class DataBoostDataset(Dataset):
                              trajectory if seq_len was not specified
         '''
         path_id, start_idx, end_idx = self.slices[idx]
-        if path_id in self.limited_data_cache:
-            traj_data = self.limited_data_cache[path_id]
+        if self.paths[path_id] in self.limited_data_cache:
+            traj_data = self.limited_data_cache[self.paths[path_id]]
         else:
             traj_data = read_h5(self.paths[path_id])
-            if len(self.limited_data_cache) > 600:
+            if len(self.limited_data_cache) > 3000:
                 self.limited_data_cache.pop(list(self.limited_data_cache.keys())[0])
             self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
             return traj_data
-        traj_len = self.get_traj_len(traj_data)
+        # traj_len = self.get_traj_len(traj_data)
+        traj_len = self.path_lens[self.paths[path_id]]
         traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
         if self.goal_condition:
             _, goal_max_idx = self.pretrain_goals[idx]
             # goal_idx = random.randint(goal_min_idx, goal_max_idx)
             goal_frame = get_traj_slice(
                 traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
-            n_repeats = traj_seq["observations"].shape[-2]  # the seq_len axis
+            # n_repeats = traj_seq["observations"].shape[-2]  # the seq_len axis
             traj_seq["observations"] = np.concatenate(
-                (traj_seq["observations"], np.repeat(goal_frame["observations"], n_repeats, axis=-2)), axis=-1)
+                (traj_seq["observations"], np.repeat(goal_frame["observations"], self.seq_len, axis=-2)), axis=-1)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
@@ -506,7 +520,7 @@ class DatasetGeneratorBase:
         '''
         raise NotImplementedError
 
-    def get_max_traj_len(self, \
+    def get_max_traj_len(self,
                          env: gym.Env,
                          task_config: Dict) -> int:
         '''get the maximum allowed trajectory length for an episode
