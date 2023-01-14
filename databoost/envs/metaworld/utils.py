@@ -16,6 +16,7 @@ def initialize_env(env: MujocoEnv) -> MujocoEnv:
     env._partially_observable = False
     env._freeze_rand_vec = False
     env._set_task_called = True
+    env.reset()
     return env
 
 

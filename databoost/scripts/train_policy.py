@@ -31,7 +31,6 @@ def train(policy: nn.Module,
           goal_condition: bool = False):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(device)
     policy = policy.train().to(device)
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
     best_success_rate = 0
@@ -82,20 +81,27 @@ if __name__ == "__main__":
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = "all"
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond-4"
-    # dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
-    dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/all"
+    boosting_method = "large_seed-prior_fail"
     goal_condition = True
+    mask_goal_pos = True
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+
+    benchmark_configs = {
+        "benchmark_name": benchmark_name,
+        "mask_goal_pos": mask_goal_pos
+    }
 
     dataloader_configs = {
-        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",
-        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/boosted_data/{task_name}/{boosting_method}",
-        "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data",
+        "dataset_dir": [
+            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
+            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/prior/fail",
+        ],
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
         "shuffle": True,
+        "load_imgs": False,
         "goal_condition": goal_condition
     }
 
@@ -112,7 +118,7 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 5,
+        "eval_period": 10,
         "eval_episodes": 20,
         "max_traj_len": 500,
         "n_epochs": 100,
@@ -121,19 +127,20 @@ if __name__ == "__main__":
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 300,
+        "n_episodes": 200,
         "max_traj_len": 500,
-        "goal_cond": goal_condition
+        "goal_cond": goal_condition,
     }
 
     rollout_configs = {
         "task_name": task_name,
         "n_episodes": 10,
         "max_traj_len": 500,
-        "goal_cond": goal_condition
+        "goal_cond": goal_condition,
     }
 
     configs = {
+        "benchmark_configs": benchmark_configs,
         "dataloader_configs": dataloader_configs,
         "policy_configs": policy_configs,
         "train_configs": train_configs,
@@ -151,7 +158,7 @@ if __name__ == "__main__":
     )
 
     os.makedirs(dest_dir, exist_ok=True)
-    benchmark = databoost.get_benchmark(benchmark_name)
+    benchmark = databoost.get_benchmark(**benchmark_configs)
     env = benchmark.get_env(task_name)
     dataloader = env._get_dataloader(**dataloader_configs)
 

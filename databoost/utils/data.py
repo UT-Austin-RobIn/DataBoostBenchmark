@@ -6,6 +6,7 @@ from typing import Any, List, Dict, Tuple
 import h5py
 import numpy as np
 import torch
+import wandb
 
 from databoost.utils.general import AttrDict
 
@@ -44,7 +45,7 @@ def find_h5(dir: str) -> List[str]:
     return file_paths
 
 
-def read_h5(path: str) -> Dict:
+def read_h5(path: str, load_imgs: bool = True) -> Dict:
     '''Read h5 file into dictionary
     Args:
         path [str]: path to the h5 file
@@ -54,6 +55,8 @@ def read_h5(path: str) -> Dict:
     def unpack_h5_recurse(h5_data):
         data = AttrDict()
         for key in h5_data.keys():
+            if not load_imgs and key == "imgs":
+                continue
             if hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
                 data[key] = unpack_h5_recurse(h5_data[key])
             else:

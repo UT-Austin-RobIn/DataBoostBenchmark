@@ -44,6 +44,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                  prior_dataset_url: str,
                  seed_dataset_url: str,
                  render_func: Callable,
+                 postproc_func: Callable = None,
                  test_dataset_url: str = None):
         super().__init__(env)
         self.env = env
@@ -51,6 +52,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         self.seed_dataset_url = seed_dataset_url
         self.test_dataset_url = test_dataset_url
         self.render_func = render_func
+        self.postproc_func = postproc_func
 
     def _get_dataset(self, dataset_dir: str, n_demos: int = None) -> AttrDict:
         '''loads offline dataset.
@@ -81,6 +83,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                         seq_len: int = None,
                         batch_size: int = 1,
                         shuffle: bool = True,
+                        load_imgs: bool = True,
                         goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader to load in h5 data from the given dataset_dir.
 
@@ -94,7 +97,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         Returns:
             dataloader [DataLoader]: DataLoader for given dataset directory
         '''
-        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, goal_condition)
+        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, load_imgs=load_imgs, postproc_func=self.postproc_func, goal_condition=goal_condition)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_seed_dataset(self, n_demos: int = None) -> Dataset:
@@ -122,6 +125,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                             seq_len: int = None,
                             batch_size: int = 1,
                             shuffle: bool = True,
+                            load_imgs: bool = True,
                             goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader for this benchmark's seed dataset.
 
@@ -140,6 +144,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     seq_len=seq_len,
                                     batch_size=batch_size,
                                     shuffle=shuffle,
+                                    load_imgs=load_imgs,
                                     goal_condition=goal_condition)
 
     def get_prior_dataloader(self,
@@ -147,6 +152,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                              seq_len: int = None,
                              batch_size: int = 1,
                              shuffle: bool = True,
+                             load_imgs: bool = True,
                              goal_condition: bool = False) -> DataLoader:
         '''gets a dataloader for this benchmark's prior dataset.
 
@@ -165,6 +171,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
                                     seq_len=seq_len,
                                     batch_size=batch_size,
                                     shuffle=shuffle,
+                                    load_imgs=load_imgs,
                                     goal_condition=goal_condition)
 
     def default_render(self) -> np.ndarray:
@@ -188,11 +195,32 @@ class DataBoostEnvWrapper(gym.Wrapper):
             test_env_dict = pickle.load(f)
         self.env = test_env_dict["env"]
         test_env_dict.pop("env")
+        if self.postproc_func is not None:
+            test_env_dict["starting_ob"], _, _, _ = self.postproc_func(
+                test_env_dict["starting_ob"], None, None, None)
+            test_env_dict["goal_ob"], _, _, _ = self.postproc_func(
+                test_env_dict["goal_ob"], None, None, None)
         return test_env_dict
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        if self.postproc_func is not None:
+            obs, reward, done, info = self.postproc_func(
+                obs, reward, done, info
+            )
+        return obs, reward, done, info
+
+    def reset(self):
+        obs = self.env.reset()
+        if self.postproc_func is not None:
+            obs, _, _, _ = self.postproc_func(
+                obs, None, None, None
+            )
+        return obs
 
 
 class DataBoostBenchmarkBase:
-    def __init__(self):
+    def __init__(self, *args):
         '''DataBoostBenchmark is a wrapper to standardize the benchmark across
         environments and tasks. This class includes functionality to load the
         environment and datasets (both seed and prior).
@@ -202,6 +230,7 @@ class DataBoostBenchmarkBase:
                                     benchmark
         '''
         self.tasks_list = None
+        self.postproc_func = None
 
     def get_env(self, task_name: str) -> DataBoostEnvWrapper:
         '''get the wrapped gym environment corresponding to the specified task.
@@ -299,6 +328,8 @@ class DataBoostDataset(Dataset):
                  dataset_dir: str,
                  n_demos: int = None,
                  seq_len: int = None,
+                 load_imgs: bool = True,
+                 postproc_func: Callable = None,
                  goal_condition: bool = False):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
@@ -330,6 +361,9 @@ class DataBoostDataset(Dataset):
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         self.goal_condition = goal_condition
+        self.paths = []
+        self.path_lens = {}
+
         if type(dataset_dir) in (list, tuple):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
@@ -346,18 +380,24 @@ class DataBoostDataset(Dataset):
 
             self.slices = []
             for path_id, path in enumerate(self.paths):
-                traj_data = read_h5(path)
+                traj_data = read_h5(path, load_imgs=load_imgs)
+                if postproc_func is not None:
+                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
+                        postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
                 traj_len = self.get_traj_len(traj_data)
+                self.path_lens[path] = traj_len
+                self.limited_data_cache[path] = traj_data  # temp, for speed
                 self.slices.append((path_id, 0, traj_len))
             print(f"Dataloader contains {len(self.slices)} slices")
             return
 
-        self.paths = []
-        self.path_lens = {}
         # filter for files that are long enough
         print("filtering files of sufficient length")
         for file_path in tqdm(file_paths):
-            traj_data = read_h5(file_path)
+            traj_data = read_h5(file_path, load_imgs=load_imgs)
+            if postproc_func is not None:
+                traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
+                    postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
                 self.paths.append(file_path)
@@ -723,14 +763,16 @@ class DatasetGeneratorBase:
                     ob, rew, done, info = self.post_process_step(
                         env, ob, rew, done, info)
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
-                    # if len(traj["observations"]) > 300 and not self.is_success(env, ob, rew, done, info):
                     if self.is_success(env, ob, rew, done, info):
+                    # if len(traj["observations"]) > 200 and not self.is_success(env, ob, rew, done, info):
                         num_success += 1
                         traj = self.traj_to_numpy(traj)
                         filename = f"{task_name}_{num_success}"
-                        write_h5(traj, os.path.join(task_dir, filename + ".h5"))
-                        # write_h5(traj, os.path.join(task_dir, filename + "_fail.h5"))
-                        if save_env_and_goal:
+                        traj["dones"][-1] = True
+                        if not save_env_and_goal:
+                            write_h5(traj, os.path.join(task_dir, filename + ".h5"))
+                            # write_h5(traj, os.path.join(task_dir, filename + "_fail.h5"))
+                        else:
                             with open(os.path.join(
                                 task_dir, filename + ".pkl"), "wb") as f:
                                 goal_ob = traj.observations[-1]

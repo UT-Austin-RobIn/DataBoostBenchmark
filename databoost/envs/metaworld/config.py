@@ -48,6 +48,13 @@ tasks = {
         "test_dataset": os.path.join(env_root, "test/plate-slide-side"),
         "expert_policy": policies.SawyerPlateSlideSideV2Policy,
     }),
+    "coffee-push": AttrDict({
+        "task_name": "coffee-push",
+        "env": ALL_V2_ENVS["coffee-push-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
+        "test_dataset": os.path.join(env_root, "test/coffee-push"),
+        "expert_policy": policies.SawyerCoffeePushV2Policy,
+    }),
     "door-close": AttrDict({
         "task_name": "door-close",
         "env": ALL_V2_ENVS["door-close-v2"],
@@ -119,12 +126,6 @@ tasks = {
         "env": ALL_V2_ENVS["coffee-pull-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
         "expert_policy": policies.SawyerCoffeePullV2Policy,
-    }),
-    "coffee-push": AttrDict({
-        "task_name": "coffee-push",
-        "env": ALL_V2_ENVS["coffee-push-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
-        "expert_policy": policies.SawyerCoffeePushV2Policy,
     }),
     "dial-turn": AttrDict({
         "task_name": "dial-turn",
@@ -327,14 +328,14 @@ seed_tasks_list = [
     "pick-place-wall",
     "door-open",
     "plate-slide-back-side",
-    "plate-slide-side"
+    "coffee-push"
 ]
-seed_dataset_dir = os.path.join(env_root, "data/expanded_seed")
+seed_dataset_dir = os.path.join(env_root, "data/large_seed")
 seed_n_demos = 50
 seed_do_render = True
 seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.1,
+    "act_noise_pct": 0.05,
     "resolution": (224, 224),
     "camera": "corner"
 })
@@ -342,12 +343,12 @@ seed_dataset_kwargs = AttrDict({
 
 '''Prior tasks configs'''
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/prior")
-prior_n_demos = 10
+prior_dataset_dir = os.path.join(env_root, "data/prior/fail")
+prior_n_demos = 50
 prior_do_render = True
 prior_save_env_and_goal = False
 prior_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.1,
+    "act_noise_pct": 0.7,
     "resolution": (224, 224),
     "camera": "corner"
 })
@@ -359,14 +360,14 @@ test_tasks_list = [
     "pick-place-wall",
     "door-open",
     "plate-slide-back-side",
-    "plate-slide-side"
+    "coffee-push"
 ]
 test_dataset_dir = os.path.join(env_root, "test")
 test_n_demos = 100
 test_do_render = True
 test_save_env_and_goal = True
 test_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.1,
+    "act_noise_pct": 0.0,
     "resolution": (224, 224),
     "camera": "corner"
 })
