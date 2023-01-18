@@ -1,9 +1,11 @@
 """Torch implementation of Implicit Q-Learning (IQL)
 https://github.com/ikostrikov/implicit_q_learning
 """
-
+import abc
 import pickle
 from collections import OrderedDict
+from typing import Iterable
+
 import numpy as np
 import torch
 import torch.optim as optim
@@ -21,15 +23,15 @@ class LinearTransform(nn.Module):
         self.b = b
 
     def __call__(self, t):
-        return self.m * t + self.
+        return self.m * t + self.b
 
-class TorchTrainer(Trainer, metaclass=abc.ABCMeta):
+class TorchTrainer(metaclass=abc.ABCMeta):
     def __init__(self):
         self._num_train_steps = 0
 
     def train(self, np_batch):
         self._num_train_steps += 1
-        batch = np_to_pytorch_batch(np_batch)
+        batch = ptu.np_to_pytorch_batch(np_batch)
         self.train_from_torch(batch)
 
     def get_diagnostics(self):
@@ -49,7 +51,7 @@ class TorchTrainer(Trainer, metaclass=abc.ABCMeta):
 class IQLTrainer(TorchTrainer):
     def __init__(
             self,
-            env,
+            # env,
             policy,
             qf1,
             qf2,
@@ -81,9 +83,11 @@ class IQLTrainer(TorchTrainer):
             soft_target_tau=1e-2,
             target_update_period=1,
             beta=1.0,
+
+            device = None
     ):
         super().__init__()
-        self.env = env
+        # self.env = env
         self.policy = policy
         self.qf1 = qf1
         self.qf2 = qf2
@@ -149,12 +153,15 @@ class IQLTrainer(TorchTrainer):
         self.beta = beta
         self.quantile = quantile
 
+        self.device = device
+
     def train_from_torch(self, batch, train=True, pretrain=False,):
-        rewards = batch['rewards']
-        terminals = batch['terminals']
-        obs = batch['observations']
-        actions = batch['actions']
-        next_obs = batch['next_observations']
+        rewards = batch['rewards'][:, 0].float().to(self.device).reshape(-1, 1)
+        terminals = batch['dones'][:, 0].float().to(self.device).reshape(-1, 1)
+        obs = batch['observations'][:, 0].float().to(self.device)
+        actions = batch['actions'][:, 0].float().to(self.device)
+        next_obs = batch['observations'][:, 1].float().to(self.device)
+
         if self.reward_transform:
             rewards = self.reward_transform(rewards)
 
@@ -196,9 +203,10 @@ class IQLTrainer(TorchTrainer):
         policy_logpp = dist.log_prob(actions)
 
         adv = q_pred - vf_pred
-        exp_adv = torch.exp(adv / self.beta)
+        exp_adv = torch.exp(adv * self.beta)
         if self.clip_score is not None:
             exp_adv = torch.clamp(exp_adv, max=self.clip_score)
+
 
         weights = exp_adv[:, 0].detach()
         policy_loss = (-policy_logpp * weights).mean()
@@ -288,6 +296,20 @@ class IQLTrainer(TorchTrainer):
         #     self.eval_statistics['VF Loss'] = np.mean(ptu.get_numpy(vf_loss))
 
         self._n_train_steps_total += 1
+
+        logs = {
+            'losses/qf1_loss': qf1_loss.item(),
+            'losses/qf2_loss': qf2_loss.item(),
+            'losses/vf_loss': vf_loss.item(),
+            'losses/policy_loss': policy_loss.item(),
+            'values/vf': target_vf_pred.mean().item(),
+            'values/q_target': q_target.mean().item(),
+            'values/q1_pred': q1_pred.mean().item(),
+            'values/q2_pred': q2_pred.mean().item(),
+            'values/adv_weight': exp_adv.mean().item(),
+        }
+
+        return logs
 
     def get_diagnostics(self):
         stats = super().get_diagnostics()
