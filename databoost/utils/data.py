@@ -55,9 +55,11 @@ def read_h5(path: str, load_imgs: bool = True) -> Dict:
     def unpack_h5_recurse(h5_data):
         data = AttrDict()
         for key in h5_data.keys():
-            if not load_imgs and key == "imgs":
+            if key == "infos":  # temp
+                data[key] = {}
+            elif not load_imgs and key == "imgs":
                 continue
-            if hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
+            elif hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
                 data[key] = unpack_h5_recurse(h5_data[key])
             else:
                 data[key] = h5_data[key][()]

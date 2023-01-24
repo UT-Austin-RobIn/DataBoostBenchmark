@@ -18,6 +18,7 @@ tasks = {
         "env": ALL_V2_ENVS["assembly-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
         "test_dataset": os.path.join(env_root, "test/assembly"),
+        "val_dataset": os.path.join(env_root, "val/assembly"),
         "expert_policy": policies.SawyerAssemblyV2Policy,
     }),
     "pick-place-wall": AttrDict({
@@ -25,6 +26,7 @@ tasks = {
         "env": ALL_V2_ENVS["pick-place-wall-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
         "test_dataset": os.path.join(env_root, "test/pick-place-wall"),
+        "val_dataset": os.path.join(env_root, "val/pick-place-wall"),
         "expert_policy": policies.SawyerPickPlaceWallV2Policy,
     }),
     "door-open": AttrDict({
@@ -32,6 +34,7 @@ tasks = {
         "env": ALL_V2_ENVS["door-open-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/door-open"),
         "test_dataset": os.path.join(env_root, "test/door-open"),
+        "val_dataset": os.path.join(env_root, "val/door-open"),
         "expert_policy": policies.SawyerDoorOpenV2Policy,
     }),
     "plate-slide-back-side": AttrDict({
@@ -39,6 +42,7 @@ tasks = {
         "env": ALL_V2_ENVS["plate-slide-back-side-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back-side"),
         "test_dataset": os.path.join(env_root, "test/plate-slide-back-side"),
+        "val_dataset": os.path.join(env_root, "val/plate-slide-back-side"),
         "expert_policy": policies.SawyerPlateSlideBackSideV2Policy,
     }),
     "plate-slide-side": AttrDict({
@@ -46,6 +50,7 @@ tasks = {
         "env": ALL_V2_ENVS["plate-slide-side-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-side"),
         "test_dataset": os.path.join(env_root, "test/plate-slide-side"),
+        "val_dataset": os.path.join(env_root, "val/plate-slide-side"),
         "expert_policy": policies.SawyerPlateSlideSideV2Policy,
     }),
     "coffee-push": AttrDict({
@@ -53,7 +58,24 @@ tasks = {
         "env": ALL_V2_ENVS["coffee-push-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
         "test_dataset": os.path.join(env_root, "test/coffee-push"),
+        "val_dataset": os.path.join(env_root, "val/coffee-push"),
         "expert_policy": policies.SawyerCoffeePushV2Policy,
+    }),
+    "coffee-pull": AttrDict({
+        "task_name": "coffee-pull",
+        "env": ALL_V2_ENVS["coffee-pull-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
+        "test_dataset": os.path.join(env_root, "test/coffee-pull"),
+        "val_dataset": os.path.join(env_root, "val/coffee-pull"),
+        "expert_policy": policies.SawyerCoffeePullV2Policy,
+    }),
+    "stick-pull": AttrDict({
+        "task_name": "stick-pull",
+        "env": ALL_V2_ENVS["stick-pull-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
+        "test_dataset": os.path.join(env_root, "test/stick-pull"),
+        "val_dataset": os.path.join(env_root, "val/stick-pull"),
+        "expert_policy": policies.SawyerStickPullV2Policy,
     }),
     "door-close": AttrDict({
         "task_name": "door-close",
@@ -120,12 +142,6 @@ tasks = {
         "env": ALL_V2_ENVS["coffee-button-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-button"),
         "expert_policy": policies.SawyerCoffeeButtonV2Policy,
-    }),
-    "coffee-pull": AttrDict({
-        "task_name": "coffee-pull",
-        "env": ALL_V2_ENVS["coffee-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
-        "expert_policy": policies.SawyerCoffeePullV2Policy,
     }),
     "dial-turn": AttrDict({
         "task_name": "dial-turn",
@@ -271,12 +287,6 @@ tasks = {
         "seed_dataset": os.path.join(env_root, "data/seed/stick-push"),
         "expert_policy": policies.SawyerStickPushV2Policy,
     }),
-    "stick-pull": AttrDict({
-        "task_name": "stick-pull",
-        "env": ALL_V2_ENVS["stick-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
-        "expert_policy": policies.SawyerStickPullV2Policy,
-    }),
     "push-wall": AttrDict({
         "task_name": "push-wall",
         "env": ALL_V2_ENVS["push-wall-v2"],
@@ -328,10 +338,12 @@ seed_tasks_list = [
     "pick-place-wall",
     "door-open",
     "plate-slide-back-side",
-    "coffee-push"
+    "coffee-push",
+    "coffee-pull",
+    "stick-pull"
 ]
-seed_dataset_dir = os.path.join(env_root, "data/large_seed")
-seed_n_demos = 50
+seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_n_demos = 10
 seed_do_render = True
 seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
@@ -342,13 +354,26 @@ seed_dataset_kwargs = AttrDict({
 
 
 '''Prior tasks configs'''
+'''Notes on noise for failure cases:
+8: door-close: 15.0
+10: door-unlock: 2.0
+14: button-press-topdown: 3.0
+15: button-press-topdown-wall: 3.0
+18: coffee-button: 2.0
+22: drawer-close: 5.0
+24: faucet-open: 2.0
+25: faucet-close: 2.0
+46: sweep-into: 2.0
+48: window-open: 2.0
+49: window-close: 2.0
+'''
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/prior/fail")
-prior_n_demos = 50
-prior_do_render = True
+prior_dataset_dir = os.path.join(env_root, "data/large_prior/success")
+prior_n_demos = 500
+prior_do_render = False
 prior_save_env_and_goal = False
 prior_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.7,
+    "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
 })
@@ -360,14 +385,37 @@ test_tasks_list = [
     "pick-place-wall",
     "door-open",
     "plate-slide-back-side",
-    "coffee-push"
+    "coffee-push",
+    "coffee-pull",
+    "stick-pull"
 ]
 test_dataset_dir = os.path.join(env_root, "test")
-test_n_demos = 100
+test_n_demos = 200
 test_do_render = True
 test_save_env_and_goal = True
 test_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.0,
+    "resolution": (224, 224),
+    "camera": "corner"
+})
+
+
+'''Validation tasks configs'''
+val_tasks_list = [
+    "assembly",
+    "pick-place-wall",
+    "door-open",
+    "plate-slide-back-side",
+    "coffee-push",
+    "coffee-pull",
+    "stick-pull"
+]
+val_dataset_dir = os.path.join(env_root, "val")
+val_n_demos = 100
+val_do_render = False
+val_save_env_and_goal = False
+val_dataset_kwargs = AttrDict({
+    "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
 })

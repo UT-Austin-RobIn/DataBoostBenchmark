@@ -45,12 +45,14 @@ class DataBoostEnvWrapper(gym.Wrapper):
                  seed_dataset_url: str,
                  render_func: Callable,
                  postproc_func: Callable = None,
-                 test_dataset_url: str = None):
+                 test_dataset_url: str = None,
+                 val_dataset_url: str = None):
         super().__init__(env)
         self.env = env
         self.prior_dataset_url = prior_dataset_url
         self.seed_dataset_url = seed_dataset_url
         self.test_dataset_url = test_dataset_url
+        self.val_dataset_url = val_dataset_url
         self.render_func = render_func
         self.postproc_func = postproc_func
 
@@ -184,13 +186,16 @@ class DataBoostEnvWrapper(gym.Wrapper):
         im = self.render_func(self.env)
         return im
 
-    def load_test_env(self):
+    def load_test_env(self, idx=None):
         '''To load saved goal condition test env
         '''
         if self.test_dataset_url is None:
             raise ValueError("this env does not have a corresponding test set")
         test_pkl_files = find_pkl(self.test_dataset_url)
-        test_pkl_file = random.choice(test_pkl_files)
+        if idx is not None:
+            test_pkl_file = test_pkl_files[idx % len(test_pkl_files)]
+        else:
+            test_pkl_file = random.choice(test_pkl_files)
         with open(test_pkl_file, "rb") as f:
             test_env_dict = pickle.load(f)
         self.env = test_env_dict["env"]
@@ -201,6 +206,22 @@ class DataBoostEnvWrapper(gym.Wrapper):
             test_env_dict["goal_ob"], _, _, _ = self.postproc_func(
                 test_env_dict["goal_ob"], None, None, None)
         return test_env_dict
+
+    def load_val_demo(self, idx=None):
+        '''To load saved validation demo
+        '''
+        if self.val_dataset_url is None:
+            raise ValueError("this env does not have a corresponding validation set")
+        val_h5_files = find_h5(self.val_dataset_url)
+        if idx is not None:
+            val_h5_file = val_h5_files[idx % len(val_h5_files)]
+        else:
+            val_h5_file = random.choice(val_h5_files)
+        val_traj = read_h5(val_h5_file)
+        if self.postproc_func is not None:
+            val_traj["observations"], _, _, _ = self.postproc_func(
+                val_traj["observations"], None, None, None)
+        return val_traj
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
@@ -289,7 +310,7 @@ class DataBoostBenchmarkBase:
         '''
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
-        policy = policy.eval().to(device)
+        policy = copy.deepcopy(policy).eval().to(device)
         n_successes = 0
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
@@ -297,7 +318,7 @@ class DataBoostBenchmarkBase:
             if not goal_cond:
                 ob = env.reset()
             else:
-                test_env_dict = env.load_test_env()
+                test_env_dict = env.load_test_env(idx=episode)
                 ob = test_env_dict["starting_ob"]
                 goal_ob = test_env_dict["goal_ob"]
                 goal_im = test_env_dict["goal_im"]
@@ -321,6 +342,45 @@ class DataBoostBenchmarkBase:
         success_rate = n_successes / n_episodes
         if render: gifs = np.concatenate(gifs, axis=-1)
         return (success_rate, gifs)
+
+    def validate(self,
+                 task_name: str,
+                 policy: nn.Module,
+                 n_episodes: int,
+                 goal_cond: bool = False) -> Tuple[float, np.ndarray]:
+        '''Evaluates the performance of a given policy on the specified task.
+
+        Args:
+            task_name [str]: name of the task to evaluate policy against
+            policy [nn.Module]: the policy to evaluate (must implement
+                                act = get_action(ob) function)
+            n_episodes [int]: number of evaluation episodes
+            max_traj_len [int]: max number of steps for one episode
+            render [bool]: whether to return gif of eval rollouts
+        Returns:
+            result [Tuple[float, np.ndarray]]: tuple of success rate
+                                               (n_successes/n_episodes) and
+                                               gif (None if render is False)
+        '''
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        env = self.get_env(task_name)
+        policy = copy.deepcopy(policy).eval().to(device)
+        total_loss = 0
+        for episode in tqdm(range(int(n_episodes))):
+            val_traj = env.load_val_demo(idx=episode)
+            if goal_cond:
+                goal_ob = val_traj["observations"][-1]
+                val_traj["observations"] = np.concatenate(
+                    (val_traj["observations"], np.repeat(goal_ob[None], len(val_traj["observations"]), axis=-2)
+                ), axis = -1)
+            with torch.no_grad():
+                obs = torch.tensor(val_traj["observations"], dtype=torch.float).to(device)
+                acts = torch.tensor(val_traj["actions"], dtype=torch.float).to(device)
+                pred_action_dist = policy(obs)
+                loss = policy.loss(pred_action_dist, acts)
+                total_loss += loss.item()
+        avg_loss = total_loss / int(n_episodes)
+        return avg_loss
 
 
 class DataBoostDataset(Dataset):
@@ -456,7 +516,7 @@ class DataBoostDataset(Dataset):
             traj_data = self.limited_data_cache[self.paths[path_id]]
         else:
             traj_data = read_h5(self.paths[path_id])
-            if len(self.limited_data_cache) > 3000:
+            if len(self.limited_data_cache) > 30000:
                 self.limited_data_cache.pop(list(self.limited_data_cache.keys())[0])
             self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
@@ -740,7 +800,7 @@ class DatasetGeneratorBase:
             mask_reward [bool]: if true, all rewards are set to zero (for prior dataset)
         '''
         tasks = copy.deepcopy(tasks)
-        for task_name, task_config in tasks.items():
+        for task_id, (task_name, task_config) in enumerate(tasks.items()):
             # Initialize env and set necessary env attributes
             task_config = copy.deepcopy(task_config)
             env = self.init_env(task_config)
@@ -764,6 +824,7 @@ class DatasetGeneratorBase:
                         env, ob, rew, done, info)
                     self.add_to_traj(traj, ob, act, rew, done, info, im)
                     if self.is_success(env, ob, rew, done, info):
+                    #     break
                     # if len(traj["observations"]) > 200 and not self.is_success(env, ob, rew, done, info):
                         num_success += 1
                         traj = self.traj_to_numpy(traj)
@@ -785,4 +846,4 @@ class DatasetGeneratorBase:
                                 }, f)
                         break
                 num_tries += 1
-                print(f"generating {task_name} demos: {num_success}/{num_tries}")
+                print(f"generating {task_id};{task_name} demos: {num_success}/{num_tries}")

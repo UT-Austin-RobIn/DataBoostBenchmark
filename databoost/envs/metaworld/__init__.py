@@ -53,6 +53,7 @@ class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
                 seed_dataset_url=task_cfg.seed_dataset,
                 prior_dataset_url=cfg.prior_dataset_dir,
                 test_dataset_url=task_cfg.test_dataset if "test_dataset" in task_cfg else None,
+                val_dataset_url=task_cfg.val_dataset if "val_dataset" in task_cfg else None,
                 render_func=render,
                 postproc_func=self.postproc_func
             )

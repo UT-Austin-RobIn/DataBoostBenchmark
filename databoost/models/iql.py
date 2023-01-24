@@ -175,6 +175,7 @@ def main(benchmark, task_name, dataloader_configs, args):
             next_observations = traj_batch["observations"][:, 1, :]
             rewards = traj_batch["rewards"][:, 0]
             terminals = traj_batch["dones"][:, 0]
+            iql.update(observation, actions, next_observations, rewards, terminals)
         if (step+1) % args.eval_period == 0:
             success_rate, _ = benchmark.evaluate(
                 task_name=task_name,

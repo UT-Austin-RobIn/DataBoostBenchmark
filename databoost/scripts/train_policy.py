@@ -1,4 +1,4 @@
-# import argparse
+import copy
 import os
 import random
 
@@ -15,6 +15,7 @@ from databoost.utils.data import dump_video_wandb
 
 
 random.seed(42)
+np.random.seed(42)
 
 
 def train(policy: nn.Module,
@@ -27,17 +28,23 @@ def train(policy: nn.Module,
           eval_period: int,
           eval_episodes: int,
           max_traj_len: int,
-          n_epochs: int,
+          n_steps: int,
           goal_condition: bool = False):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     policy = policy.train().to(device)
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
-    best_success_rate = 0
+    best_eval_loss = float('inf')
 
-    for epoch in tqdm(range(int(n_epochs))):
-        losses = []
-        for batch_num, traj_batch in tqdm(enumerate(dataloader)):
+    step = 0
+    epoch = 0
+    losses = []
+
+    n_steps = int(n_steps)
+    pbar = tqdm(total=n_steps)
+    while(step < n_steps):
+        epoch += 1
+        for batch_num, traj_batch in enumerate(dataloader):
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
             obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
@@ -48,23 +55,26 @@ def train(policy: nn.Module,
             losses.append(loss.item())
             loss.backward()
             optimizer.step()
-        print(f"epoch {epoch}: loss = {np.mean(losses)}")
-        wandb.log({"epoch": epoch, "loss": np.mean(losses)})
-        if epoch % eval_period == 0:
-            print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
-            success_rate, _ = benchmark.evaluate(
-                task_name=task_name,
-                policy=policy,
-                n_episodes=eval_episodes,
-                max_traj_len=max_traj_len,
-                goal_cond=goal_condition,
-                render=False
-            )
-            wandb.log({"epoch": epoch, "success_rate": success_rate})
-            print(f"epoch {epoch}: success_rate = {success_rate}")
-            if success_rate >= best_success_rate:
-                torch.save(policy, os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                best_success_rate = success_rate
+            step += 1
+            pbar.update(1)
+            if (step % eval_period) == 0:                
+                print(f"evaluating step {step} with {eval_episodes} episodes")
+                eval_loss = benchmark.validate(
+                    task_name=task_name,
+                    policy=policy,
+                    n_episodes=eval_episodes,
+                    goal_cond=goal_condition
+                )
+                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "eval_loss": eval_loss})
+                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses)}, eval_loss = {eval_loss}")
+                losses = []
+                if eval_loss <= best_eval_loss:
+                    torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                    best_eval_loss = eval_loss
+            if step >= n_steps: break
+        epoch += 1
+    pbar.close()
+
     return policy
 
 if __name__ == "__main__":
@@ -73,18 +83,64 @@ if __name__ == "__main__":
 
 
     # '''temp'''
-    # parser = argparse.ArgumentParser(
-    #     description='temp')
-    # parser.add_argument("--boosting_method", help="boosting method")
-    # args = parser.parse_args()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='temp')
+    parser.add_argument("--n_success", help="num success prior groups")
+    # parser.add_argument("--n_seed", help="num seed groups")
+    args = parser.parse_args()
+    very_helpful_tasks = [
+        "push-back",
+        "pick-place",
+        "hand-insert"
+    ]
+    helpful_tasks = [
+        "push-back",
+        "pick-place",
+        "hand-insert",
+        "push",
+        "sweep",
+        "coffee-push",
+        "soccer",
+        "sweep-into",
+        "bin-picking",
+        "peg-insert-side"
+    ] # 10 of them
+    harmful_tasks = [
+        "lever-pull",
+        "plate-slide",
+        "assembly",
+        "pick-out-of-hole",
+        "coffee-pull",
+        "handle-pull-side",
+        "button-press-wall",
+        "reach-wall",
+        "button-press",
+        "button-press-topdown"
+    ] # 10 of them
+    from databoost.envs.metaworld.config import tasks
+    all_tasks = list(tasks.keys())
+    ##### Prior experiments
+    num_demos_per_group = 2000
+    num_success_groups = int(args.n_success)
+    num_fail_groups = 10 - num_success_groups
+    # num_seeds_per_group = 2
+    # num_seed_groups = int(args.n_seed)
+    #####
+    ##### Oracle boost experiments
+    # num_demos_per_group = 40
+    # num_success_groups = int(args.n_success)
+    #####
     # ''''''
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = "large_seed-prior_fail"
+    # boosting_method = f"small_seed_{num_seed_groups * num_seeds_per_group}_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_6"
+    boosting_method = f"seed_3_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_1"
+    # boosting_method = f"seed_3_+_oracle_boost_{int(num_success_groups * num_demos_per_group)}_1"
     goal_condition = True
     mask_goal_pos = True
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
     dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
 
     benchmark_configs = {
@@ -93,9 +149,42 @@ if __name__ == "__main__":
     }
 
     dataloader_configs = {
+        # "dataset_dir": [
+        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
+        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task_name}",
+        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/fail/{task_name}",
+        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/fail",
+        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success",
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{args.task_data}",
+        # ],
+        # "dataset_dir": [
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task}" \
+        #     for task in very_helpful_tasks
+        # ] + [
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task}" \
+        #     for task in harmful_tasks
+        # ] + [
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
+        # ],
         "dataset_dir": [
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/prior/fail",
+        ##### Prior experiments
+            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/fail/{group_num + 1}_of_10" \
+            for group_num in range(num_fail_groups)
+        ] + [
+            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/success/{group_num + 1}_of_10" \
+            for group_num in range(num_success_groups)
+        ] + [
+        #####
+        ##### Oracle experiments
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed/{group_num + 1}_of_10" \
+        #     for group_num in range(num_success_groups)
+        # ] + [
+        #####
+        ##### seed
+           f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/small_seed/{task_name}"
+        ##### grouped small seed
+            # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_small_seed/{group_num + 1}_of_5" \
+            # for group_num in range(num_seed_groups)
         ],
         "n_demos": None,
         "batch_size": 128,
@@ -118,16 +207,16 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 10,
-        "eval_episodes": 20,
+        "eval_period": 1e3,
+        "eval_episodes": 100,
         "max_traj_len": 500,
-        "n_epochs": 100,
+        "n_steps": 5e5,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 200,
+        "n_episodes": 300,
         "max_traj_len": 500,
         "goal_cond": goal_condition,
     }
@@ -168,9 +257,10 @@ if __name__ == "__main__":
                    benchmark=benchmark,
                    **train_configs)
 
-    torch.save(policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    final_policy = copy.deepcopy(policy)
+    torch.save(final_policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
     success_rate, _ = benchmark.evaluate(
-        policy=policy,
+        policy=final_policy,
         render=False,
         **eval_configs
     )
