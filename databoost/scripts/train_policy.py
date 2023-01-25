@@ -14,8 +14,8 @@ from databoost.base import DataBoostBenchmarkBase
 from databoost.utils.data import dump_video_wandb
 
 
-random.seed(42)
-np.random.seed(42)
+random.seed(88)
+np.random.seed(88)
 
 
 def train(policy: nn.Module,
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
     # boosting_method = f"small_seed_{num_seed_groups * num_seeds_per_group}_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_6"
-    boosting_method = f"seed_3_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_1"
+    boosting_method = f"seed_3_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_2"
     # boosting_method = f"seed_3_+_oracle_boost_{int(num_success_groups * num_demos_per_group)}_1"
     goal_condition = True
     mask_goal_pos = True
