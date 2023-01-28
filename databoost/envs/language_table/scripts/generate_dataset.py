@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+from typing import Dict
 from databoost.utils.general import AttrDict
 from databoost.utils.data import write_h5
 
@@ -141,5 +142,5 @@ if __name__ == "__main__":
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
         dest_dir='/data/karl/data/table_sim/prior_data',
-        n_episodes=3,
+        n_episodes=1000,
     )
