@@ -38,17 +38,9 @@ def train(policy: nn.Module,
     for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
-            if not hasattr(traj_batch, "observations"):
-                obs, act = [], []
-                for step in traj_batch["steps"]:
-                    obs.append(
-                        np.concatenate((step['observation']['effector_translation'].numpy(),
-                                        step['observation']['effector_target_translation'].numpy()), axis=-1))
-                    act.append(step["action"].numpy())
-                traj_batch = {
-                    "observations": torch.from_numpy(np.stack(obs, axis=1)),
-                    "actions": torch.from_numpy(np.stack(act, axis=1)),
-                }
+            if not isinstance(traj_batch["observations"], torch.Tensor):
+                for key in traj_batch:
+                    traj_batch[key] = torch.from_numpy(traj_batch[key])
 
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)

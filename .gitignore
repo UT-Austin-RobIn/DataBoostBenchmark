@@ -14,3 +14,6 @@ eggs/
 .eggs/
 *.egg-info/
 *.egg
+
+# Pycharm
+.idea

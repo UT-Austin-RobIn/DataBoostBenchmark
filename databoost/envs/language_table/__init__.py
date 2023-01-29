@@ -89,13 +89,33 @@ class DataBoostEnvWrapperLanguageTable(DataBoostEnvWrapper):
         Returns:
             dataloader [DataLoader]: DataLoader for given dataset directory
         '''
+        def prep_episode(episode):
+            """Samples random subsequence, extracts observation, builds output dict."""
+            # sample random start step
+            steps = list(iter(episode['steps']))
+            start_step = np.random.randint(0, len(steps) - seq_len - 1)
+
+            obs, act = [], []
+            for step in steps[start_step : start_step + seq_len]:
+                obs.append(
+                    tf.concat((step['observation']['effector_translation'],
+                               step['observation']['effector_target_translation']), axis=-1))
+                act.append(step["action"])
+            episode = {
+                "observations": tf.stack(obs, axis=0),
+                "actions": tf.stack(act, axis=0),
+            }
+            return episode
+
         builder = tfds.builder_from_directory(os.path.join(dataset_dir, '0.0.1'))
         ds = builder.as_dataset(split='train')
+        ds = ds.map(prep_episode)
+
         if shuffle:
             ds = ds.shuffle(1024)
         ds = ds.batch(batch_size)
         ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
-        return ds #tfds.as_numpy(ds)
+        return tfds.as_numpy(ds)
 
 
 __all__ = [DataBoostBenchmarkLanguageTable]
