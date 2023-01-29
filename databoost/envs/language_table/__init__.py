@@ -1,5 +1,6 @@
 import copy
-from typing import Dict
+import os
+from typing import Dict, Any
 
 import gym
 import numpy as np
@@ -7,6 +8,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
+from databoost.utils.general import AttrDict
 from language_table.environments import blocks
 from language_table.environments import language_table
 from language_table.environments.rewards import block2block
@@ -27,14 +29,14 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         '''
         env = language_table.LanguageTable(
             block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
-            reward_factory=reward_factory,
+            reward_factory=block2block.BlockToBlockReward,
             seed=0
         )
         env = DataBoostEnvWrapperLanguageTable(
                 env,
-                seed_dataset_url=task_cfg.seed_dataset,
-                prior_dataset_url=cfg.prior_dataset_dir,
-                test_dataset_url=task_cfg.test_dataset if "test_dataset" in task_cfg else None,
+                seed_dataset_url=None,
+                prior_dataset_url=None,
+                test_dataset_url=None,
                 render_func=lambda x: x.render(),
             )
         return env
@@ -74,7 +76,7 @@ class DataBoostEnvWrapperLanguageTable(DataBoostEnvWrapper):
                         batch_size: int = 1,
                         shuffle: bool = True,
                         load_imgs: bool = True,
-                        goal_condition: bool = False) -> DataLoader:
+                        goal_condition: bool = False) -> Any: #DataLoader:
         '''gets a dataloader to load in h5 data from the given dataset_dir.
 
         Args:
@@ -90,10 +92,10 @@ class DataBoostEnvWrapperLanguageTable(DataBoostEnvWrapper):
         builder = tfds.builder_from_directory(os.path.join(dataset_dir, '0.0.1'))
         ds = builder.as_dataset(split='train')
         if shuffle:
-            ds = ds.shuffle()
+            ds = ds.shuffle(1024)
         ds = ds.batch(batch_size)
         ds = ds.prefetch(tf.data.experimental.AUTOTUNE)
-        return tfds.as_numpy(ds)
+        return ds #tfds.as_numpy(ds)
 
 
 __all__ = [DataBoostBenchmarkLanguageTable]
