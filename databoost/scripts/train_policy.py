@@ -38,6 +38,18 @@ def train(policy: nn.Module,
     for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
+            if not hasattr(traj_batch, "observations"):
+                obs, act = [], []
+                for step in traj_batch.steps:
+                    obs.append(
+                        np.concatenate((step['observation']['effector_translation'],
+                                        step['observation']['effector_target_translation']), axis=-1))
+                    act.append(step["action"])
+                traj_batch = {
+                    "observations": torch.from_numpy(np.stack(obs, axis=1)),
+                    "actions": torch.from_numpy(np.stack(act, axis=1)),
+                }
+
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
             obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
@@ -79,13 +91,47 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # ''''''
 
-    benchmark_name = "metaworld"
-    task_name = "pick-place-wall"
-    boosting_method = "large_seed-prior_fail"
-    goal_condition = True
-    mask_goal_pos = True
+    # benchmark_name = "metaworld"
+    # task_name = "pick-place-wall"
+    # boosting_method = "large_seed-prior_fail"
+    # goal_condition = True
+    # mask_goal_pos = True
+    # exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    # dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+    #
+    # benchmark_configs = {
+    #     "benchmark_name": benchmark_name,
+    #     "mask_goal_pos": mask_goal_pos
+    # }
+    #
+    # dataloader_configs = {
+    #     "dataset_dir": [
+    #         f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
+    #         f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/prior/fail",
+    #     ],
+    #     "n_demos": None,
+    #     "batch_size": 128,
+    #     "seq_len": 1,
+    #     "shuffle": True,
+    #     "load_imgs": False,
+    #     "goal_condition": goal_condition
+    # }
+    #
+    # policy_configs = {
+    #     "obs_dim": 39 * (2 if goal_condition else 1),
+    #     "action_dim": 4,
+    #     "hidden_dim": 512,
+    #     "n_hidden_layers": 4,
+    #     "dropout_rate": 0.4
+    # }
+
+    benchmark_name = "language_table"
+    task_name = "None"
+    boosting_method = "None"
+    goal_condition = False
+    mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
-    dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+    dest_dir = f"/data/karl/experiments/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -94,8 +140,8 @@ if __name__ == "__main__":
 
     dataloader_configs = {
         "dataset_dir": [
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/prior/fail",
+            "gs://gresearch/robotics/language_table_sim",
+            "gs://gresearch/robotics/language_table_sim"
         ],
         "n_demos": None,
         "batch_size": 128,
@@ -106,8 +152,8 @@ if __name__ == "__main__":
     }
 
     policy_configs = {
-        "obs_dim": 39 * (2 if goal_condition else 1),
-        "action_dim": 4,
+        "obs_dim": 4 * (2 if goal_condition else 1),
+        "action_dim": 2,
         "hidden_dim": 512,
         "n_hidden_layers": 4,
         "dropout_rate": 0.4
