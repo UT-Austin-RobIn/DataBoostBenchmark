@@ -8,6 +8,7 @@ gym==0.26.2
 gym-notices==0.0.8
 imageio==2.22.3
 importlib-metadata==5.0.0
+language_table @ git+https://github.com/google-research/language-table.git
 metaworld @ git+https://github.com/rlworkgroup/metaworld.git@18118a28c06893da0f363786696cc792457b062b
 mujoco-py==2.1.2.14
 numpy==1.21.6

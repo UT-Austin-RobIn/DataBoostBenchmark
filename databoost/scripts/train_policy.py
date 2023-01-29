@@ -40,11 +40,11 @@ def train(policy: nn.Module,
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
             if not hasattr(traj_batch, "observations"):
                 obs, act = [], []
-                for step in traj_batch.steps:
+                for step in traj_batch["steps"]:
                     obs.append(
-                        np.concatenate((step['observation']['effector_translation'],
-                                        step['observation']['effector_target_translation']), axis=-1))
-                    act.append(step["action"])
+                        np.concatenate((step['observation']['effector_translation'].numpy(),
+                                        step['observation']['effector_target_translation'].numpy()), axis=-1))
+                    act.append(step["action"].numpy())
                 traj_batch = {
                     "observations": torch.from_numpy(np.stack(obs, axis=1)),
                     "actions": torch.from_numpy(np.stack(act, axis=1)),
@@ -135,14 +135,10 @@ if __name__ == "__main__":
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
-        "mask_goal_pos": mask_goal_pos
     }
 
     dataloader_configs = {
-        "dataset_dir": [
-            "gs://gresearch/robotics/language_table_sim",
-            "gs://gresearch/robotics/language_table_sim"
-        ],
+        "dataset_dir": "gs://gresearch/robotics/language_table_sim",
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
@@ -198,7 +194,7 @@ if __name__ == "__main__":
         resume=exp_name,
         project="boost",
         config=configs,
-        dir="/tmp",
+        dir="/tmp/wandb_karl",
         entity="clvr",
         notes="",
     )
