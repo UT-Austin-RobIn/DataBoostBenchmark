@@ -38,10 +38,6 @@ def train(policy: nn.Module,
     for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
-            # if not isinstance(traj_batch["observations"], torch.Tensor):
-            #     for key in traj_batch:
-            #         traj_batch[key] = torch.from_numpy(traj_batch[key])
-
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
             obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
@@ -54,7 +50,7 @@ def train(policy: nn.Module,
             optimizer.step()
         print(f"epoch {epoch}: loss = {np.mean(losses)}")
         wandb.log({"epoch": epoch, "loss": np.mean(losses)})
-        if False: #epoch % eval_period == 0:
+        if epoch % eval_period == 0:
             print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
             success_rate, _ = benchmark.evaluate(
                 task_name=task_name,
