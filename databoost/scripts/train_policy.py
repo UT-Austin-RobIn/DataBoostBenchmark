@@ -54,7 +54,7 @@ def train(policy: nn.Module,
             optimizer.step()
         print(f"epoch {epoch}: loss = {np.mean(losses)}")
         wandb.log({"epoch": epoch, "loss": np.mean(losses)})
-        if epoch % eval_period == 0:
+        if False: #epoch % eval_period == 0:
             print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
             success_rate, _ = benchmark.evaluate(
                 task_name=task_name,
