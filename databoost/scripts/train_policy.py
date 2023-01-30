@@ -1,4 +1,5 @@
 # import argparse
+import clip
 import os
 import random
 
@@ -40,8 +41,15 @@ def train(policy: nn.Module,
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
-            obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
-            pred_action_dist = policy(obs_batch.float())
+            obs_batch = obs_batch[:, 0, :].float()  # remove the window dimension, since just 1
+
+            # append language instruction to observation
+            decoded_instructions = [bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+                                    for inst in traj_batch['info']['instruction'][:, 0].data.cpu().numpy()]
+            text_tokens = clip.tokenize(decoded_instructions).to(device).float()  # [batch, 77]
+            obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
+
+            pred_action_dist = policy(obs_batch)
             action_batch = traj_batch["actions"].to(device)
             action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
             loss = policy.loss(pred_action_dist, action_batch)
@@ -136,7 +144,7 @@ if __name__ == "__main__":
     }
 
     policy_configs = {
-        "obs_dim": 2048 * (2 if goal_condition else 1),
+        "obs_dim": 2048 + 77 * (2 if goal_condition else 1),
         "action_dim": 2,
         "hidden_dim": 512,
         "n_hidden_layers": 4,
