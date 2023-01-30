@@ -1,3 +1,4 @@
+import clip
 import copy
 import os
 from typing import Dict, Any
@@ -38,11 +39,19 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
                                        datasets
         '''
         def language_table_postproc(obs, reward, done, info):
-            '''Encode image with r3m for observation.'''
+            '''Prepare observation.'''
             if isinstance(obs, dict):
+                # encode images with R3M
                 img = torch.from_numpy(obs['rgb'].transpose(2, 0, 1)).to(self.device)[None]
                 img = torchvision.transforms.Resize((224, 224))(img)
                 obs = self.r3m(img).data.cpu().numpy()[0]  # [1, 2048]
+
+                # encode text with CLIP
+                inst = obs['instruction']
+                decoded_instruction = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+                text_tokens = clip.tokenize(decoded_instruction).to(self.device).float()[None]  # [1, 77]
+                obs = torch.cat((obs, text_tokens), dim=-1)
+
             return obs, reward, done, info
 
         env = language_table.LanguageTable(
