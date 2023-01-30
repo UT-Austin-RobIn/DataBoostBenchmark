@@ -32,11 +32,11 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
             reward_factory=block2block.BlockToBlockReward,
             seed=0
         )
-        env = DataBoostEnvWrapperLanguageTable(
+        env = DataBoostEnvWrapper(
                 env,
-                seed_dataset_url=None,
-                prior_dataset_url=None,
-                test_dataset_url=None,
+                seed_dataset_url="/data/karl/data/table_sim/prior_data",
+                prior_dataset_url="/data/karl/data/table_sim/prior_data",
+                test_dataset_url="/data/karl/data/table_sim/prior_data",
                 render_func=lambda x: x.render(),
             )
         return env
