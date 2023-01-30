@@ -7,6 +7,7 @@ import tensorflow_datasets as tfds
 from typing import Dict
 from databoost.utils.general import AttrDict
 from databoost.utils.data import write_h5
+from r3m import load_r3m
 
 
 class DatasetSaver:
@@ -30,6 +31,10 @@ class DatasetSaver:
             'language_table_blocktorelative_oracle_sim': 'gs://gresearch/robotics/language_table_blocktorelative_oracle_sim',
             'language_table_separate_oracle_sim': 'gs://gresearch/robotics/language_table_separate_oracle_sim',
         }
+        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self.r3m = load_r3m("resnet50")  # resnet18, resnet34
+        self.r3m.eval()
+        self.r3m.to(self.device)
 
     def init_traj(self) -> Dict:
         '''Initialize an empty trajectory, preparing for data collection
@@ -132,7 +137,17 @@ class DatasetSaver:
 
                 self.add_to_traj(traj, ob, act, rew, done, info, im)
 
+            # encode images with R3M
+            imgs = torch.from_numpy(tf.stack(traj.imgs).numpy().transpose(0, 3, 1, 2)).to(self.device)
+            encs = self.r3m(imgs).data.cpu().numpy()  # [seq_len, 2048]
+
+            # move trajectory data to numpy
             traj = self.traj_to_numpy(traj)
+            
+            # overwrite obs with R3M encoding, remove images
+            traj.pop('imgs')
+            traj.observations = encs
+
             filename = f"episode_{i}"
             traj["dones"][-1] = True
             write_h5(traj, os.path.join(dest_dir, filename + ".h5"))
