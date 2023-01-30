@@ -7,12 +7,13 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import torch
+import torchvision
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
 from databoost.utils.general import AttrDict
 from language_table.environments import blocks
 from language_table.environments import language_table
-from language_table.environments.rewards import block2block
+from language_table.environments.rewards import block2block, separate_blocks
 from r3m import load_r3m
 
 
@@ -38,14 +39,15 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         '''
         def language_table_postproc(obs, reward, done, info):
             '''Encode image with r3m for observation.'''
-            img = torch.from_numpy(obs['rgb'].transpose(2, 0, 1)).to(self.device)[None]
-            img = torchvision.transforms.Resize((224, 224))(img)
-            obs = self.r3m(img).data.cpu().numpy()[0]  # [1, 2048]
+            if isinstance(obs, dict):
+                img = torch.from_numpy(obs['rgb'].transpose(2, 0, 1)).to(self.device)[None]
+                img = torchvision.transforms.Resize((224, 224))(img)
+                obs = self.r3m(img).data.cpu().numpy()[0]  # [1, 2048]
             return obs, reward, done, info
 
         env = language_table.LanguageTable(
             block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
-            reward_factory=block2block.BlockToBlockReward,
+            reward_factory=separate_blocks.SeparateBlocksReward,
             seed=0
         )
         env = DataBoostEnvWrapper(
