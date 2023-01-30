@@ -1,4 +1,6 @@
 import tqdm
+import torch
+import torchvision
 import os
 import numpy as np
 import tensorflow as tf
@@ -139,6 +141,7 @@ class DatasetSaver:
 
             # encode images with R3M
             imgs = torch.from_numpy(tf.stack(traj.imgs).numpy().transpose(0, 3, 1, 2)).to(self.device)
+            imgs = torchvision.transforms.Resize((224, 224))(imgs)
             encs = self.r3m(imgs).data.cpu().numpy()  # [seq_len, 2048]
 
             # move trajectory data to numpy
