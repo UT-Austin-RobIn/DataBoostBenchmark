@@ -1,9 +1,12 @@
 """language_table_r3m dataset."""
 
-import tensorflow_datasets as tfds
+import apache_beam as beam
+import os
 import tensorflow as tf
+import tensorflow_datasets as tfds
 import torch
 from r3m import load_r3m
+from language_table.environments import language_table
 
 SUBSEQ_LEN = 1
 R3M_FEATURE_SIZE = 2048
@@ -40,19 +43,20 @@ class Builder(tfds.core.GeneratorBasedBuilder):
 
   def _split_generators(self, dl_manager: tfds.download.DownloadManager):
     """Returns SplitGenerators."""
-    builder = tfds.builder_from_directory(os.path.join(ORIG_DATASET_PATH, '0.0.1'))
+    # builder = tfds.builder_from_directory(os.path.join(ORIG_DATASET_PATH, '0.0.1'))
 
     # TODO(language_table_r3m): Returns the Dict[split names, Iterator[Key, Example]]
     return {
-        'train': self._generate_examples(builder.as_dataset(split='train[:10]'), 'train'),
+        'train': self._generate_examples(None, 'train'), #builder.as_dataset(split='train[:10]'), 'train'),
         # 'val': self._generate_examples(builder.as_dataset(split='val'), 'val'),
         # 'test': self._generate_examples(builder.as_dataset(split='test'), 'test'),
     }
 
   def _generate_examples(self, ds, split):
     """Yields examples."""
-    for i, episode in enumerate(ds):
+    def _generate_example(episode):
         # extract raw observation-action pair
+        print("ALLO")
         obs, act = [], []
         instruct = None
         for step in episode['steps']:
@@ -72,3 +76,7 @@ class Builder(tfds.core.GeneratorBasedBuilder):
                 'observations': encs[i : i+SUBSEQ_LEN],
                 'actions': acts[i : i+SUBSEQ_LEN],
             }
+
+    builder = tfds.builder_from_directory("/data/karl/data/table_sim/language_table_sim/0.0.1")
+    return (tfds.beam.ReadFromTFDS(builder, split='train[:2000]')
+            | beam.FlatMap(_generate_example))
