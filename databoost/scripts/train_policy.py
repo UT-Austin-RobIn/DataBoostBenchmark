@@ -125,12 +125,12 @@ if __name__ == "__main__":
     # }
 
     benchmark_name = "language_table"
-    task_name = "None"
-    boosting_method = "None"
+    task_name = "separate"
+    boosting_method = "oracle"
     goal_condition = False
     mask_goal_pos = False
-    exp_name = f"{benchmark_name}-clipenc-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
-    dest_dir = f"/data/karl/experiments/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+    exp_name = f"{benchmark_name}-clipenc_dummy-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    dest_dir = f"/data/karl/experiments/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -161,10 +161,10 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 3,
+        "eval_period": 10,
         "eval_episodes": 40,
         "max_traj_len": 200,
-        "n_epochs": 100,
+        "n_epochs": 200,
         "goal_condition": goal_condition
     }
 
