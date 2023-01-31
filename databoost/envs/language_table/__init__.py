@@ -26,6 +26,7 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         self.r3m = load_r3m("resnet50")  # resnet18, resnet34
         self.r3m.eval()
         self.r3m.to(self.device)
+        self.clip_model, _ = clip.load("ViT-B/32", device=self.device)
 
     def get_env(self, task_name: str) -> DataBoostEnvWrapper:
         '''get the wrapped gym environment corresponding to the specified task.
@@ -44,13 +45,15 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
                 # encode images with R3M
                 img = torch.from_numpy(obs['rgb'].transpose(2, 0, 1)).to(self.device)[None]
                 img = torchvision.transforms.Resize((224, 224))(img)
-                obs = self.r3m(img).data.cpu().numpy()[0]  # [1, 2048]
+                img_obs = self.r3m(img).data.cpu().numpy()[0]  # [2048,]
 
                 # encode text with CLIP
                 inst = obs['instruction']
                 decoded_instruction = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-                text_tokens = clip.tokenize(decoded_instruction).to(self.device).float()[None]  # [1, 77]
-                obs = torch.cat((obs, text_tokens), dim=-1)
+                text_tokens = clip.tokenize(decoded_instruction)#.float()[0]  # [77,]
+                text_tokens = self.clip_model.encode_text(
+                        text_tokens.to(self.device)).data.cpu().numpy()[0]   # [512,]
+                obs = np.concatenate((img_obs, text_tokens), axis=-1)
 
             return obs, reward, done, info
 

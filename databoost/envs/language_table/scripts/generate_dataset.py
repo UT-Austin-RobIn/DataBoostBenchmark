@@ -110,7 +110,7 @@ class DatasetSaver:
         # make dataset
         dataset_path = os.path.join(self._dataset_directories[dataset_name], '0.0.1')
         builder = tfds.builder_from_directory(dataset_path)
-        episode_ds = builder.as_dataset(split='train')
+        episode_ds = builder.as_dataset(split='train[:50%]')
 
         # choose data size
         if n_episodes < 0:
@@ -159,6 +159,6 @@ class DatasetSaver:
 if __name__ == "__main__":
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
-        dest_dir='/data/karl/data/table_sim/prior_data',
-        n_episodes=1000,
+        dest_dir='/data/karl/data/table_sim/prior_data/batch1',
+        #n_episodes=1000,
     )
