@@ -273,10 +273,6 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
 
         return MultivariateGaussian(mean, torch.log(std))#MultivariateDiagonalNormal(mean, std)
 
-    def get_action(self, obs):
-        act = self.forward(torch.tensor(obs).float().to('cuda')).mu.cpu().detach().numpy()
-        return act
-
 class ConcatMlp(Mlp):
     """
     Concatenate inputs along dimension and then pass through MLP.

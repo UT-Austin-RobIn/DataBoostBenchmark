@@ -14,16 +14,16 @@ import wandb
 from databoost.base import DataBoostBenchmarkBase
 from databoost.utils.data import dump_video_wandb
 from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
-from databoost.models.iql.iql import IQLTrainer
+from databoost.models.iql.iql import IQLModel
 
-random.seed(42)
+# random.seed(42)
 
 def map_dict(fn, d):
     """takes a dictionary and applies the function to every element"""
     return type(d)(map(lambda kv: (kv[0], fn(kv[1])), d.items()))
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-def train(trainer,
+def train(iql_policy,
           dataloader: DataLoader,
           benchmark: DataBoostBenchmarkBase,
           exp_name: str,
@@ -35,25 +35,42 @@ def train(trainer,
           max_traj_len: int,
           n_epochs: int,
           n_epoch_cycles: int,
+          n_save_best: int,
           goal_condition: bool = False):
 
-    best_success_rate = 0
-    global_step = 0
+    best_success_rate = [-1 for i in range(3)]
+    min_success_best = 0
+
+    global_step = iql_policy._n_train_steps_total
     for epoch in tqdm(range(int(n_epochs))):
         for cycle in range(n_epoch_cycles):
-            logs = {}
+            logs, agg = {}, {}
             for batch_num, batch in enumerate(dataloader):
-                log = trainer.train_from_torch(batch)
+                log = iql_policy.train_from_torch(batch)
+                
                 for k in log:
-                    logs[k] = logs[k]+(log[k]/len(dataloader)) if k in logs else log[k]/len(dataloader)
+                    if 'losses/' == k[:7] or 'values/' == k[:7]:
+                        logs[k] = logs[k]+(log[k]/len(dataloader)) if k in logs else log[k]/len(dataloader)
+                    else:
+                        parent = k.split('/')[0]
+                        agg[k] = agg[k] + log[parent + '/num_samples'] if k in agg else log[parent + '/num_samples']
+                        logs[k] = logs[k] + log[k] if k in logs else log[k]
+                
                 global_step += 1
+            
+            for k in logs:
+                if 'values_seed/' == k[:12] or 'values_prior/' == k[:13]:
+                    logs[k] /= agg[k]
+            logs['values_seed/num_samples'] = agg['values_seed/num_samples']/(agg['values_seed/num_samples'] + agg['values_prior/num_samples'])
+            logs['values_prior/num_samples'] = 1 - logs['values_seed/num_samples']
+            logs['epochs'] = epoch*n_epoch_cycles + cycle
             wandb.log(logs, step=global_step)
 
         if epoch % eval_period == 0:
             print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
             success_rate, gifs = benchmark.evaluate(
                 task_name=task_name,
-                policy=trainer.policy,
+                policy=iql_policy,
                 n_episodes=eval_episodes,
                 max_traj_len=max_traj_len,
                 goal_cond=goal_condition,
@@ -62,50 +79,38 @@ def train(trainer,
 
             wandb.log({"success_rate": success_rate}, step=global_step)
             print(f"epoch {epoch}: success_rate = {success_rate}")
-            if success_rate >= best_success_rate:
-                torch.save(trainer.policy, os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                best_success_rate = success_rate
-    return trainer
+
+            # saving the top 'n_save_best' policies
+            if success_rate >= best_success_rate[min_success_best]:
+                torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-best{min_success_best}.pt"))
+                best_success_rate[min_success_best] = success_rate
+                min_success_best = np.argmin(best_success_rate)
+
+            torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    return iql_policy
 
 if __name__ == "__main__":
     import databoost
     from databoost.models.bc import BCPolicy
 
-
-    # '''temp'''
-    # parser = argparse.ArgumentParser(
-    #     description='temp')
-    # parser.add_argument("--boosting_method", help="boosting method")
-    # args = parser.parse_args()
-    # ''''''
-
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
     boosting_method = ""
-    version = "seed_and_prior_success"
+    version = "success50_fail50"
     exp_name = f"{benchmark_name}-{task_name}-{version}-{sys.argv[1]}"
-    # dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
     dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/all"
     goal_condition = False
 
     dataloader_configs = {
-        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}",
-        # "dataset_dir": f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/boosted_data/{task_name}/{boosting_method}",
         "dataset_dir": f"/home/sdass/boosting/data/pick_place_wall/{version}",
         "n_demos": None,
         "batch_size": 256,
         "seq_len": 2,
         "shuffle": True,
-        "goal_condition": goal_condition
+        "goal_condition": goal_condition,
+        "seed_sample_ratio": 0.5,
+        "terminal_sample_ratio": 0.01
     }
-
-    # policy_configs = {
-    #     "obs_dim": 39 * (2 if goal_condition else 1),
-    #     "action_dim": 4,
-    #     "hidden_dim": 512,
-    #     "n_hidden_layers": 4,
-    #     "dropout_rate": 0.4
-    # }
 
     obs_dim = 39 * (2 if goal_condition else 1)
     action_dim = 4
@@ -150,17 +155,16 @@ if __name__ == "__main__":
                     ).to(device),
 
         "discount": 0.995,
-        "quantile": 0.9,
+        "quantile": 0.7,
         "clip_score": 100,
         "soft_target_tau": 0.005,
         "reward_scale": 10,
         "beta": 10.0,
-
         "policy_lr": 1e-3,
         "qf_lr": 1e-3,
-        # "policy_weight_decay": 0,
-        # "q_weight_decay": 0,
-
+        # "policy_weight_decay": 0.01,
+        # "q_weight_decay": 0.01,
+        # "optimizer_class": torch.optim.AdamW,
         "device": device
     }
 
@@ -172,8 +176,9 @@ if __name__ == "__main__":
         "eval_period": 5,
         "eval_episodes": 20,
         "max_traj_len": 500,
-        "n_epochs": 1000, #iql : 1000
-        "n_epoch_cycles": 5,
+        "n_epochs": 150, #iql : 1000
+        "n_epoch_cycles": 1,
+        "n_save_best": 3,
         "goal_condition": goal_condition
     }
 
@@ -212,34 +217,30 @@ if __name__ == "__main__":
     benchmark = databoost.get_benchmark(benchmark_name)
     env = benchmark.get_env(task_name)
     dataloader = env._get_dataloader(**dataloader_configs)
+    iql_policy = IQLModel(**policy_configs)
 
-    policy = train(trainer=IQLTrainer(**policy_configs),
+    policy = train(iql_policy=iql_policy,
                    dataloader=dataloader,
                    benchmark=benchmark,
-                   **train_configs).policy
+                   **train_configs)
 
-    torch.save(policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
-    # success_rate, _ = benchmark.evaluate(
-    #     policy=policy,
-    #     render=False,
-    #     **eval_configs
-    # )
-    # print(f"final success_rate: {success_rate}")
-    # wandb.log({"final_success_rate": success_rate})
+    torch.save(policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
 
-    best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
-    success_rate, _ = benchmark.evaluate(
-        policy=best_policy,
-        render=False,
-        **eval_configs
-    )
-    print(f"best success_rate: {success_rate}")
-    wandb.log({"best_success_rate": success_rate})
+    for i in range(train_configs['n_save_best']):
+        checkpoint = torch.load(os.path.join(dest_dir, f"{exp_name}-best{i}.pt"))
+        iql_policy.load_from_checkpoint(checkpoint, True)
+        success_rate, _ = benchmark.evaluate(
+            policy=iql_policy,
+            render=False,
+            **eval_configs
+        )
+        print(f"best success_rate: {success_rate}")
+        wandb.log({f"best_success_rate{i}": success_rate})
 
-    # '''generate sample policy rollouts'''
-    success_rate, gifs = benchmark.evaluate(
-        policy=best_policy,
-        render=True,
-        **rollout_configs
-    )
-    dump_video_wandb(gifs, "rollouts")
+        '''generate sample policy rollouts'''
+        success_rate, gifs = benchmark.evaluate(
+            policy=iql_policy,
+            render=True,
+            **rollout_configs
+        )
+        dump_video_wandb(gifs, "rollouts{i}")

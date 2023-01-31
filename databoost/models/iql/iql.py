@@ -25,30 +25,7 @@ class LinearTransform(nn.Module):
     def __call__(self, t):
         return self.m * t + self.b
 
-class TorchTrainer(metaclass=abc.ABCMeta):
-    def __init__(self):
-        self._num_train_steps = 0
-
-    def train(self, np_batch):
-        self._num_train_steps += 1
-        batch = ptu.np_to_pytorch_batch(np_batch)
-        self.train_from_torch(batch)
-
-    def get_diagnostics(self):
-        return OrderedDict([
-            ('num train calls', self._num_train_steps),
-        ])
-
-    @abc.abstractmethod
-    def train_from_torch(self, batch):
-        pass
-
-    @property
-    @abc.abstractmethod
-    def networks(self) -> Iterable[nn.Module]:
-        pass
-
-class IQLTrainer(TorchTrainer):
+class IQLModel(nn.Module):
     def __init__(
             self,
             # env,
@@ -86,7 +63,7 @@ class IQLTrainer(TorchTrainer):
 
             device = None
     ):
-        super().__init__()
+        super(IQLModel, self).__init__()
         # self.env = env
         self.policy = policy
         self.qf1 = qf1
@@ -161,6 +138,7 @@ class IQLTrainer(TorchTrainer):
         obs = batch['observations'][:, 0].float().to(self.device)
         actions = batch['actions'][:, 0].float().to(self.device)
         next_obs = batch['observations'][:, 1].float().to(self.device)
+        seed_bool = batch['seed'][:, 0].int().detach().numpy()
 
         if self.reward_transform:
             rewards = self.reward_transform(rewards)
@@ -242,61 +220,12 @@ class IQLTrainer(TorchTrainer):
             ptu.soft_update_from_to(
                 self.qf2, self.target_qf2, self.soft_target_tau
             )
-
-        # """
-        # Save some statistics for eval
-        # """
-        # if self._need_to_update_eval_statistics:
-        #     self._need_to_update_eval_statistics = False
-        #     """
-        #     Eval should set this to None.
-        #     This way, these statistics are only computed for one batch.
-        #     """
-        #     self.eval_statistics['QF1 Loss'] = np.mean(ptu.get_numpy(qf1_loss))
-        #     self.eval_statistics['QF2 Loss'] = np.mean(ptu.get_numpy(qf2_loss))
-        #     self.eval_statistics['Policy Loss'] = np.mean(ptu.get_numpy(
-        #         policy_loss
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'Q1 Predictions',
-        #         ptu.get_numpy(q1_pred),
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'Q2 Predictions',
-        #         ptu.get_numpy(q2_pred),
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'Q Targets',
-        #         ptu.get_numpy(q_target),
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'rewards',
-        #         ptu.get_numpy(rewards),
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'terminals',
-        #         ptu.get_numpy(terminals),
-        #     ))
-        #     self.eval_statistics['replay_buffer_len'] = self.replay_buffer._size
-        #     policy_statistics = add_prefix(dist.get_diagnostics(), "policy/")
-        #     self.eval_statistics.update(policy_statistics)
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'Advantage Weights',
-        #         ptu.get_numpy(weights),
-        #     ))
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'Advantage Score',
-        #         ptu.get_numpy(adv),
-        #     ))
-
-        #     self.eval_statistics.update(create_stats_ordered_dict(
-        #         'V1 Predictions',
-        #         ptu.get_numpy(vf_pred),
-        #     ))
-        #     self.eval_statistics['VF Loss'] = np.mean(ptu.get_numpy(vf_loss))
-
+            
         self._n_train_steps_total += 1
 
+        seed_idx = np.where(seed_bool == 1)[0]
+        prior_idx = np.where(seed_bool == 0)[0]
+        
         logs = {
             'losses/qf1_loss': qf1_loss.item(),
             'losses/qf2_loss': qf2_loss.item(),
@@ -307,17 +236,27 @@ class IQLTrainer(TorchTrainer):
             'values/q1_pred': q1_pred.mean().item(),
             'values/q2_pred': q2_pred.mean().item(),
             'values/adv_weight': exp_adv.mean().item(),
+            
+            # seed specific logs
+            'values_seed/vf': target_vf_pred[seed_idx].sum().item(),
+            'values_seed/q_target': q_target[seed_idx].sum().item(),
+            'values_seed/q1_pred': q1_pred[seed_idx].sum().item(),
+            'values_seed/q2_pred': q2_pred[seed_idx].sum().item(),
+            'values_seed/dones': terminals[seed_idx].sum().item(),
+            'values_seed/rewards': rewards[seed_idx].sum().item(),
+            'values_seed/num_samples': len(seed_idx),
+
+            # prior specific logs
+            'values_prior/vf': target_vf_pred[prior_idx].sum().item(),
+            'values_prior/q_target': q_target[prior_idx].sum().item(),
+            'values_prior/q1_pred': q1_pred[prior_idx].sum().item(),
+            'values_prior/q2_pred': q2_pred[prior_idx].sum().item(),
+            'values_prior/dones': terminals[prior_idx].sum().item(),
+            'values_prior/rewards': rewards[prior_idx].sum().item(),
+            'values_prior/num_samples': len(prior_idx)
         }
 
         return logs
-
-    def get_diagnostics(self):
-        stats = super().get_diagnostics()
-        stats.update(self.eval_statistics)
-        return stats
-
-    def end_epoch(self, epoch):
-        self._need_to_update_eval_statistics = True
 
     @property
     def networks(self):
@@ -340,3 +279,29 @@ class IQLTrainer(TorchTrainer):
             target_qf2=self.target_qf2,
             vf=self.vf,
         )
+    
+    def get_all_state_dicts(self) -> dict:
+        state_dicts = {
+            "vf_optimizer": self.vf_optimizer.state_dict(),
+            "qf1_optimizer": self.qf1_optimizer.state_dict(),
+            "qf2_optimizer": self.qf2_optimizer.state_dict(),
+            "policy_optimizer": self.policy_optimizer.state_dict(),
+            "network_state_dicts": self.state_dict(),
+            "n_train_steps_total": self._n_train_steps_total,
+        }
+        return state_dicts
+    
+    def load_from_checkpoint(self, state_dicts_dict: dict, load_optimizer: bool):
+        self.load_state_dict(
+            state_dicts_dict["network_state_dicts"], strict=False
+        )  # strict false for if we disable the progress predictor
+        if load_optimizer:
+            self.vf_optimizer.load_state_dict(state_dicts_dict["vf_optimizer"])
+            self.qf1_optimizer.load_state_dict(state_dicts_dict["qf1_optimizer"])
+            self.qf2_optimizer.load_state_dict(state_dicts_dict["qf2_optimizer"])
+            self.policy_optimizer.load_state_dict(state_dicts_dict["policy_optimizer"])
+        self._n_train_steps_total = state_dicts_dict["n_train_steps_total"]
+    
+    def get_action(self, obs):
+        act = self.policy(torch.tensor(obs).float().to('cuda')).mu.cpu().detach().numpy()
+        return act

@@ -17,7 +17,7 @@ benchmarks = {
 benchmarks_list = list(benchmarks.keys())
 
 
-def get_benchmark(benchmark_name: str) -> DataBoostBenchmarkBase:
+def get_benchmark(benchmark_name: str, **benchmark_args) -> DataBoostBenchmarkBase:
     '''Returns an initialized benchmark object corresponding to the specified
     benchmark name.
 
@@ -28,7 +28,7 @@ def get_benchmark(benchmark_name: str) -> DataBoostBenchmarkBase:
         benchmark [DataBoostBenchmarkBase]: initialized benchmark object
     '''
     assert benchmark_name in benchmarks_list
-    benchmark = benchmarks[benchmark_name]()
+    benchmark = benchmarks[benchmark_name](**benchmark_args)
     return benchmark
 
 __all__ = [get_benchmark, benchmarks_list]
