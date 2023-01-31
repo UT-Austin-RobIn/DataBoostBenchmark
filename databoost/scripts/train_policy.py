@@ -46,11 +46,11 @@ def train(policy: nn.Module,
             obs_batch = obs_batch[:, 0, :].float()  # remove the window dimension, since just 1
 
             # append language instruction to observation
-            decoded_instructions = [bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-                                    for inst in traj_batch['infos']['instruction'][:, 0].data.cpu().numpy()]
-            text_tokens = clip.tokenize(decoded_instructions).to(device)#.float()  # [batch, 77]
-            text_tokens = model.encode_text(text_tokens)
-            obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
+            #decoded_instructions = [bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+            #                        for inst in traj_batch['infos']['instruction'][:, 0].data.cpu().numpy()]
+            #text_tokens = clip.tokenize(decoded_instructions).to(device)#.float()  # [batch, 77]
+            #text_tokens = model.encode_text(text_tokens)
+            #obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
 
             pred_action_dist = policy(obs_batch)
             action_batch = traj_batch["actions"].to(device)
@@ -137,8 +137,8 @@ if __name__ == "__main__":
     }
 
     dataloader_configs = {
-        #"dataset_dir": "/data/karl/data/table_sim/prior_data",
-        "dataset_dir": "/home/karl/data/language_table/prior_data",
+        #"dataset_dir": "/data/karl/data/table_sim/prior_data_clip",
+        "dataset_dir": "/home/karl/data/language_table/prior_data_clip",
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
@@ -161,9 +161,9 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 10,
-        "eval_episodes": 20,
-        "max_traj_len": 500,
+        "eval_period": 3,
+        "eval_episodes": 40,
+        "max_traj_len": 200,
         "n_epochs": 100,
         "goal_condition": goal_condition
     }
