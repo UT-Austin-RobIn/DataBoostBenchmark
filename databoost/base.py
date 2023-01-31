@@ -402,9 +402,14 @@ class DataBoostDataset(Dataset):
                     postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
 
             # filter by instruction
-            inst = traj_data["infos"]["instruction"][0]
-            instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-            if "separate" not in instruction_str: continue
+            #inst = traj_data["infos"]["instruction"][0]
+            #instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+            #if "separate" not in instruction_str: continue
+            #import shutil
+            #if len(self.paths) < 100:
+            #    shutil.copyfile(file_path, "/home/karl/data/language_table/seed_task_separate/seed_episode_{}.h5".format(len(self.paths)))
+            #else:
+            #    exit(0)
 
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
