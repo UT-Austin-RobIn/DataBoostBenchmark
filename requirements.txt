@@ -1,5 +1,6 @@
 certifi @ file:///croot/certifi_1665076670883/work/certifi
 cffi==1.15.1
+clip @ git+https://github.com/openai/CLIP.git
 cloudpickle==2.2.0
 Cython==0.29.32
 fasteners==0.18

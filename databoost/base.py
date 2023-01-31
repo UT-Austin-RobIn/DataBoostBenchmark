@@ -370,6 +370,7 @@ class DataBoostDataset(Dataset):
                 file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
+        #file_paths = file_paths[:1000]
         if self.seq_len is None:
             if n_demos is None: n_demos = len(file_paths)
             # if no seq_len is given, no need to proceed with slicing.
