@@ -334,20 +334,20 @@ tasks = {
 
 '''Seed tasks configs'''
 seed_tasks_list = [
-    "assembly",
+    # "assembly",
     "pick-place-wall",
-    "door-open",
-    "plate-slide-back-side",
-    "coffee-push",
-    "coffee-pull",
-    "stick-pull"
+    # "door-open",
+    # "plate-slide-back-side",
+    # "coffee-push",
+    # "coffee-pull",
+    # "stick-pull"
 ]
-seed_dataset_dir = os.path.join(env_root, "data/seed")
-seed_n_demos = 10
-seed_do_render = True
+seed_dataset_dir = os.path.join(env_root, "data/grouped_seed_exp")
+seed_n_demos = 800
+seed_do_render = False
 seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.05,
+    "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
 })
@@ -368,9 +368,9 @@ seed_dataset_kwargs = AttrDict({
 49: window-close: 2.0
 '''
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/large_prior/success")
-prior_n_demos = 500
-prior_do_render = False
+prior_dataset_dir = os.path.join(env_root, "data/prior/success")
+prior_n_demos = 50
+prior_do_render = True
 prior_save_env_and_goal = False
 prior_dataset_kwargs = AttrDict({
     "act_noise_pct": 0.1,
@@ -411,7 +411,7 @@ val_tasks_list = [
     "stick-pull"
 ]
 val_dataset_dir = os.path.join(env_root, "val")
-val_n_demos = 100
+val_n_demos = 300
 val_do_render = False
 val_save_env_and_goal = False
 val_dataset_kwargs = AttrDict({

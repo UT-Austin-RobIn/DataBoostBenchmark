@@ -12,10 +12,11 @@ import wandb
 
 from databoost.base import DataBoostBenchmarkBase
 from databoost.utils.data import dump_video_wandb
+from databoost.utils.general import AttrDict
 
 
-random.seed(88)
-np.random.seed(88)
+random.seed(83)
+np.random.seed(83)
 
 
 def train(policy: nn.Module,
@@ -34,7 +35,8 @@ def train(policy: nn.Module,
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     policy = policy.train().to(device)
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
-    best_eval_loss = float('inf')
+    # best_eval_loss = float('inf')
+    best_success_rate = 0
 
     step = 0
     epoch = 0
@@ -48,7 +50,7 @@ def train(policy: nn.Module,
             optimizer.zero_grad()
             obs_batch = traj_batch["observations"].to(device)
             obs_batch = obs_batch[:, 0, :]  # remove the window dimension, since just 1
-            pred_action_dist = policy(obs_batch.float())
+            pred_action_dist, _ = policy(obs_batch.float())
             action_batch = traj_batch["actions"].to(device)
             action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
             loss = policy.loss(pred_action_dist, action_batch)
@@ -65,28 +67,37 @@ def train(policy: nn.Module,
                     n_episodes=eval_episodes,
                     goal_cond=goal_condition
                 )
-                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "eval_loss": eval_loss})
-                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses)}, eval_loss = {eval_loss}")
+                success_rate, _ = benchmark.evaluate(
+                    policy=policy,
+                    render=False,
+                    task_name=task_name,
+                    n_episodes=100,
+                    max_traj_len=500,
+                    goal_cond=goal_condition
+                )
+                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "eval_loss": eval_loss, "success_rate": success_rate})
+                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses)}, eval_loss = {eval_loss}, success_rate = {success_rate}")
                 losses = []
-                if eval_loss <= best_eval_loss:
+                # if eval_loss <= best_eval_loss:
+                if success_rate >= best_success_rate:
                     torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                    best_eval_loss = eval_loss
+                    best_success_rate = success_rate
             if step >= n_steps: break
-        epoch += 1
     pbar.close()
 
     return policy
 
 if __name__ == "__main__":
     import databoost
-    from databoost.models.bc import BCPolicy
+    from databoost.models.bc import BCPolicy, TanhGaussianBCPolicy
 
 
     # '''temp'''
     import argparse
     parser = argparse.ArgumentParser(
         description='temp')
-    parser.add_argument("--n_success", help="num success prior groups")
+    parser.add_argument("--n_task_demos", help="num seed groups")
+    # parser.add_argument("--n_success", help="num success prior groups")
     # parser.add_argument("--n_seed", help="num seed groups")
     args = parser.parse_args()
     very_helpful_tasks = [
@@ -121,9 +132,10 @@ if __name__ == "__main__":
     from databoost.envs.metaworld.config import tasks
     all_tasks = list(tasks.keys())
     ##### Prior experiments
-    num_demos_per_group = 2000
-    num_success_groups = int(args.n_success)
-    num_fail_groups = 10 - num_success_groups
+    # num_demos_per_group = 2000
+    # num_success_groups = int(args.n_success)
+    # num_fail_groups = 10 - num_success_groups
+    ### with seed groups
     # num_seeds_per_group = 2
     # num_seed_groups = int(args.n_seed)
     #####
@@ -131,13 +143,23 @@ if __name__ == "__main__":
     # num_demos_per_group = 40
     # num_success_groups = int(args.n_success)
     #####
+    ##### Splitsville
+    num_task_demos_per_group = 5
+    num_demo_groups = int(args.n_task_demos) // num_task_demos_per_group
     # ''''''
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
     # boosting_method = f"small_seed_{num_seed_groups * num_seeds_per_group}_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_6"
-    boosting_method = f"seed_3_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_2"
-    # boosting_method = f"seed_3_+_oracle_boost_{int(num_success_groups * num_demos_per_group)}_1"
+    # boosting_method = f"success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_tanhGauss_3"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_tanhGauss_6"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{10*5*50}_2"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{0}_2"
+    # n_demo_steps = ["500", "1K", "2K", "3K", "5K", "10K", "20K", "30K", "50K"]
+    # boosting_method = f"mtsac_2500K-demos_{n_demo_steps[int(args.n_groups)-1]}-1"
+    # boosting_method = f"split-steps-rl_1e6-demos_perc_60"
+    boosting_method = f"split-oracle-{args.n_task_demos}-1"
+    # boosting_method = "test"
     goal_condition = True
     mask_goal_pos = True
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
@@ -167,39 +189,66 @@ if __name__ == "__main__":
         #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
         # ],
         "dataset_dir": [
+        ##### RL experiments
+        #     f"/home/jullian-yapeter/data/metaworld/metaworld_rl_v3_h5/{e}" for e in [4,8,12,18]
+        # ] + [
+        ##### Prior small
+        #     f"/home/jullian-yapeter/data/{benchmark_name}/grouped_prior_small/success/{group_num + 1}_of_40" \
+        #     for group_num in range(num_demo_groups)
+        # ] + [
         ##### Prior experiments
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/fail/{group_num + 1}_of_10" \
-            for group_num in range(num_fail_groups)
-        ] + [
-            f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/success/{group_num + 1}_of_10" \
-            for group_num in range(num_success_groups)
-        ] + [
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/fail/{group_num + 1}_of_10" \
+        #     for group_num in range(num_fail_groups)
+        # ] + [
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/success/{group_num + 1}_of_10" \
+        #     for group_num in range(num_success_groups)
+        # ] + [
         #####
         ##### Oracle experiments
         #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed/{group_num + 1}_of_10" \
         #     for group_num in range(num_success_groups)
         # ] + [
         #####
+        ##### grouped exp experiments
+        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed_exp/{task_name}/{group_num + 1}_of_9" \
+        #     for group_num in range(int(args.n_groups))
+        # ] + [
+        #####
         ##### seed
-           f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/small_seed/{task_name}"
+        #    f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
         ##### grouped small seed
-            # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_small_seed/{group_num + 1}_of_5" \
-            # for group_num in range(num_seed_groups)
+            f"/home/jullian-yapeter/data/{benchmark_name}/grouped_seed_small/{group_num + 1}_of_40" \
+            for group_num in range(num_demo_groups)
         ],
         "n_demos": None,
-        "batch_size": 128,
+        "batch_size": 500,
         "seq_len": 1,
         "shuffle": True,
         "load_imgs": False,
         "goal_condition": goal_condition
     }
 
+    # policy_configs = {
+    #     "obs_dim": 39 * (2 if goal_condition else 1),
+    #     "action_dim": 4,
+    #     "hidden_dim": 512,
+    #     "n_hidden_layers": 4,
+    #     "dropout_rate": 0.4
+    # }
     policy_configs = {
-        "obs_dim": 39 * (2 if goal_condition else 1),
-        "action_dim": 4,
-        "hidden_dim": 512,
-        "n_hidden_layers": 4,
-        "dropout_rate": 0.4
+        "env_spec": AttrDict({
+            "observation_space": AttrDict({
+                "flat_dim": 39 * (2 if goal_condition else 1)
+            }),
+            "action_space": AttrDict({
+                "flat_dim": 4
+            })
+        }),
+        "hidden_sizes": [400, 400, 400],
+        "hidden_nonlinearity": nn.ReLU,
+        "output_nonlinearity": None,
+        "min_std": np.exp(-20.),
+        "max_std": np.exp(2.)
     }
 
     train_configs = {
@@ -207,10 +256,10 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 1e3,
-        "eval_episodes": 100,
+        "eval_period": 5e3,
+        "eval_episodes": 300,
         "max_traj_len": 500,
-        "n_steps": 5e5,
+        "n_steps": 200000,
         "goal_condition": goal_condition
     }
 
@@ -251,7 +300,8 @@ if __name__ == "__main__":
     env = benchmark.get_env(task_name)
     dataloader = env._get_dataloader(**dataloader_configs)
 
-    policy = BCPolicy(**policy_configs)
+    # policy = BCPolicy(**policy_configs)
+    policy = TanhGaussianBCPolicy(**policy_configs)
     policy = train(policy=policy,
                    dataloader=dataloader,
                    benchmark=benchmark,

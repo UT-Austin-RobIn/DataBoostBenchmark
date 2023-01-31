@@ -7,19 +7,38 @@ import numpy as np
 from tqdm import tqdm
 import os
 
-for root, dirs, files in os.walk("/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/large_prior/success"):
-    for dirpath in dirs:
+for root, dirs, files in os.walk("/data/jullian-yapeter/DataBoostBenchmark/metaworld/val"):
+    for dirpath in tqdm(dirs):
         print(dirpath)
+        if dirpath == "movies": continue
         file_paths = find_h5(os.path.join(root, dirpath))
-        # print(len(file_paths))
-        lengths = []
+        print(len(file_paths))
+        mins = []
+        maxs = []
+        # lens = []
+        # medians = []
         for file_path in tqdm(file_paths):
-            traj = read_h5(file_path, load_imgs=False)
-            lengths.append(len(traj["actions"]))
-        print(f"mean: {np.mean(lengths)}")
-        print(f"std: {np.std(lengths)}")
-        print(f"min: {np.min(lengths)}")
-        print(f"max: {np.max(lengths)}")
+            traj = read_h5(file_path, load_imgs=True)
+            # lens.append(traj["observations"].shape[0])
+            # traj["actions"] = np.clip(traj["actions"], -1.0, 1.0)
+            # write_h5(traj, file_path)
+            maxs.append(np.max(traj["actions"]))
+            mins.append(np.min(traj["actions"]))
+            # medians.append(np.median(traj["actions"]))
+            # medians.append(np.median(traj["actions"], axis=0))
+            # maxs.append(np.max(traj["actions"], axis=0))
+            # mins.append(np.min(traj["actions"], axis=0))
+        # print(np.mean(lens))
+        # print(f"mean: {np.mean(lengths)}")
+        # print(f"std: {np.std(lengths)}")
+        print(f"min: {np.min(mins)}")
+        print(f"max: {np.max(maxs)}")
+        # if(np.min(mins) < -1.0): raise ValueError
+        # if(np.max(maxs) > 1.0): raise ValueError
+        # print(f"median: {np.median(medians)}")
+        # print(f"min: {np.min(mins, axis=0)}")
+        # print(f"max: {np.max(maxs, axis=0)}")
+        # print(f"median: {np.median(medians, axis=0)}")
 # benchmark = databoost.get_benchmark("metaworld", mask_goal_pos=False)
 # env = benchmark.get_env("pick-place-wall")
 # obs = env.reset()

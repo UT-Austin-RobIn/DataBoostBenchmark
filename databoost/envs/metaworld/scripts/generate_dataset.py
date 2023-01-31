@@ -16,7 +16,7 @@ class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
         super().__init__(**datagen_kwargs)
         act_noise_pct = self.datagen_kwargs.get("act_noise_pct")
         if act_noise_pct is None:
-            act_noise_pct = np.zeros_like(env.action_space.sample())
+            act_noise_pct = np.zeros_like(self.datagen_kwargs.act_space_ptp)
         self.act_noise = act_noise_pct * self.datagen_kwargs.act_space_ptp
         self.policy = metaworld_policy
 
@@ -24,6 +24,7 @@ class DatasetGenerationPolicyMetaworld(DatasetGenerationPolicyBase):
         with torch.no_grad():
             act = self.policy.get_action(ob)
             act = np.random.normal(act, self.act_noise)
+            act = np.clip(act, -1, 1)
             return act
 
 
@@ -74,19 +75,23 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
 
 
 if __name__ == "__main__":
-    # '''generate seed dataset'''
-    # seed_dataset_generator = DatasetGeneratorMetaworld(**cfg.seed_dataset_kwargs)
-    # seed_dataset_generator.generate_dataset(
-    #     tasks = {
-    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
-    #         if task_name in cfg.seed_tasks_list
-    #     },
-    #     dest_dir = cfg.seed_dataset_dir,
-    #     n_demos_per_task = cfg.seed_n_demos,
-    #     do_render = cfg.seed_do_render,
-    #     save_env_and_goal = cfg.seed_save_env_and_goal,
-    #     mask_reward = False
-    # )
+    import random
+
+    random.seed(83)
+    np.random.seed(83)
+    '''generate seed dataset'''
+    seed_dataset_generator = DatasetGeneratorMetaworld(**cfg.seed_dataset_kwargs)
+    seed_dataset_generator.generate_dataset(
+        tasks = {
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.seed_tasks_list
+        },
+        dest_dir = cfg.seed_dataset_dir,
+        n_demos_per_task = cfg.seed_n_demos,
+        do_render = cfg.seed_do_render,
+        save_env_and_goal = cfg.seed_save_env_and_goal,
+        mask_reward = False
+    )
 
     # '''generate prior dataset'''
     # prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
@@ -117,16 +122,16 @@ if __name__ == "__main__":
     # )
 
 
-    '''generate test dataset'''
-    val_dataset_generator = DatasetGeneratorMetaworld(**cfg.val_dataset_kwargs)
-    val_dataset_generator.generate_dataset(
-        tasks = {
-            task_name: task_config for task_name, task_config in cfg.tasks.items()
-            if task_name in cfg.val_tasks_list
-        },
-        dest_dir = cfg.val_dataset_dir,
-        n_demos_per_task = cfg.val_n_demos,
-        do_render = cfg.val_do_render,
-        save_env_and_goal = cfg.val_save_env_and_goal,
-        mask_reward = False
-    )
+    # '''generate val dataset'''
+    # val_dataset_generator = DatasetGeneratorMetaworld(**cfg.val_dataset_kwargs)
+    # val_dataset_generator.generate_dataset(
+    #     tasks = {
+    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
+    #         if task_name in cfg.val_tasks_list
+    #     },
+    #     dest_dir = cfg.val_dataset_dir,
+    #     n_demos_per_task = cfg.val_n_demos,
+    #     do_render = cfg.val_do_render,
+    #     save_env_and_goal = cfg.val_save_env_and_goal,
+    #     mask_reward = False
+    # )

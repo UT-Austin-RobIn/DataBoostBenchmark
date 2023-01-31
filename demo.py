@@ -27,7 +27,7 @@ def main():
     # list out benchmark tasks
     print(f"tasks: {benchmark.tasks_list}")
     # choose task
-    task = "door-open"
+    task = "pick-place-wall"
     # instantiate corresponding environment
     env = benchmark.get_env(task)
     # get seed dataset (n_demos <= total seed demos)
@@ -76,7 +76,7 @@ def main():
         writer.write(im)
     writer.release()
     # train/load a policy
-    policy = torch.load("my_door_open_policy_1.pt")
+    policy = torch.load("/data/jullian-yapeter/DataBoostBenchmark/metaworld/models/pick-place-wall/large_seed/metaworld-pick-place-wall-large_seed-goal_cond_False-mask_goal_pos_True-9-last.pt")
     # evaluate the policy using the benchmark
     print("\n---Policy Evaluation---")
     success_rate, gif = benchmark.evaluate(

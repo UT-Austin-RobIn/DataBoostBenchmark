@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import pickle
 from typing import Any, List, Dict, Tuple
 
 import h5py
@@ -26,6 +27,14 @@ def find_pkl(dir: str) -> List[str]:
                 file_paths.append(os.path.join(root, file))
     file_paths.sort()
     return file_paths
+
+
+def read_pkl(path: str) -> Dict:
+    '''read pickle file'''
+    with open(path, 'rb') as f:
+        traj = None
+        traj = pickle.load(f)
+    return traj
 
 
 def find_h5(dir: str) -> List[str]:
@@ -57,7 +66,8 @@ def read_h5(path: str, load_imgs: bool = True) -> Dict:
         for key in h5_data.keys():
             if key == "infos":  # temp
                 data[key] = {}
-            elif not load_imgs and key == "imgs":
+                continue
+            if not load_imgs and key == "imgs":
                 continue
             elif hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
                 data[key] = unpack_h5_recurse(h5_data[key])

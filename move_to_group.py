@@ -7,11 +7,11 @@ import shutil
 from pprint import pprint
 
 
-src_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/large_prior/"
-dest_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/"
-target_dest_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_seed/"
-total_demos = 20000
-num_increments = 10
+src_root = "/home/jullian-yapeter/data/metaworld/large_prior/"
+dest_root = "/home/jullian-yapeter/data/metaworld/grouped_prior_small/"
+target_dest_root = "/home/jullian-yapeter/data/metaworld/grouped_seed_small/"
+total_demos = 10000
+num_increments = 40
 num_tasks = 50
 all_tasks = list(tasks.keys())
 all_paths = {"success": {}, "fail": {}}
@@ -24,7 +24,7 @@ num_demos_per_task = total_demos // num_increments // num_tasks
 print(num_demos_per_task)
 
 for mode in ("success", "fail"):
-    for group_num in tqdm(range(1, 11)):
+    for group_num in tqdm(range(1, num_increments + 1)):
         end_idx = group_num * num_demos_per_task
         start_idx = end_idx - num_demos_per_task
 

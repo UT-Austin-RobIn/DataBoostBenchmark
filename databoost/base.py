@@ -376,7 +376,7 @@ class DataBoostBenchmarkBase:
             with torch.no_grad():
                 obs = torch.tensor(val_traj["observations"], dtype=torch.float).to(device)
                 acts = torch.tensor(val_traj["actions"], dtype=torch.float).to(device)
-                pred_action_dist = policy(obs)
+                pred_action_dist, _ = policy(obs)
                 loss = policy.loss(pred_action_dist, acts)
                 total_loss += loss.item()
         avg_loss = total_loss / int(n_episodes)

@@ -6,7 +6,7 @@ from typing import Dict
 from tqdm import tqdm
 
 
-n_epochs = 20
+n_epochs = 51
 n_tasks = 50
 n_steps_per_ep = 500
 n_trajs = 10
@@ -73,8 +73,8 @@ traj_keys = [
     "imgs"
 ]
 
-root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v3"
-dest_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v3_h5"
+root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v4"
+dest_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v4_h5"
 
 def init_traj():
     '''Initialize an empty trajectory, preparing for data collection
@@ -137,7 +137,7 @@ def traj_to_numpy(traj: AttrDict) -> AttrDict:
 
 
 made_tasks = set()
-for ep in tqdm(range(0, n_epochs, 2)):
+for ep in tqdm(range(n_epochs)):
     for task in tqdm(tasks_list):
         for traj_id in range(n_trajs):
             traj_h5 = init_traj()
