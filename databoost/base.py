@@ -386,11 +386,6 @@ class DataBoostDataset(Dataset):
                     traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                         postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
 
-                # filter by instruction
-                inst = traj_data["infos"]["instruction"][0]
-                instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-                if "separate" not in instruction_str: continue
-
                 traj_len = self.get_traj_len(traj_data)
                 self.path_lens[path] = traj_len
                 self.limited_data_cache[path] = traj_data  # temp, for speed
@@ -405,6 +400,12 @@ class DataBoostDataset(Dataset):
             if postproc_func is not None:
                 traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                     postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
+
+            # filter by instruction
+            inst = traj_data["infos"]["instruction"][0]
+            instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+            if "separate" not in instruction_str: continue
+
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
                 self.paths.append(file_path)
