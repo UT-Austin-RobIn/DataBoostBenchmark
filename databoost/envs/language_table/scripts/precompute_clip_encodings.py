@@ -17,17 +17,17 @@ clip_model, _ = clip.load("ViT-B/32", device=device)
 file_paths = find_h5(DATA_DIR)
 print(f"Augmenting {len(file_paths)} files.")
 
-os.makedirs(DATA_DIR+SUFFIX, )
+os.makedirs(DATA_DIR+SUFFIX, exist_ok=True)
 
 # load, add clip, save
 for i, file_path in tqdm.tqdm(enumerate(file_paths)):
     data = read_h5(file_path)
 
-    inst = data['infos']['instruction']
+    inst = data['infos']['instruction'][0]
     decoded_instruction = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
     text_tokens = clip.tokenize(decoded_instruction)  # .float()[0]  # [77,]
-    text_tokens = self.clip_model.encode_text(
-        text_tokens.to(self.device)).data.cpu().numpy()  # [512,]
+    text_tokens = clip_model.encode_text(
+        text_tokens.to(device)).data.cpu().numpy()  # [512,]
     data['observations'] = np.concatenate((
         data['observations'], np.tile(text_tokens, (data['observations'].shape[0], 1))
     ), axis=-1)
