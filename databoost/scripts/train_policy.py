@@ -36,6 +36,8 @@ def train(policy: nn.Module,
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
     best_success_rate = 0
 
+    model, _ = clip.load("ViT-B/32", device=device)
+
     for epoch in tqdm(range(int(n_epochs))):
         losses = []
         for batch_num, traj_batch in tqdm(enumerate(dataloader)):
@@ -45,8 +47,9 @@ def train(policy: nn.Module,
 
             # append language instruction to observation
             decoded_instructions = [bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-                                    for inst in traj_batch['info']['instruction'][:, 0].data.cpu().numpy()]
-            text_tokens = clip.tokenize(decoded_instructions).to(device).float()  # [batch, 77]
+                                    for inst in traj_batch['infos']['instruction'][:, 0].data.cpu().numpy()]
+            text_tokens = clip.tokenize(decoded_instructions).to(device)#.float()  # [batch, 77]
+            text_tokens = model.encode_text(text_tokens)
             obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
 
             pred_action_dist = policy(obs_batch)
@@ -126,7 +129,7 @@ if __name__ == "__main__":
     boosting_method = "None"
     goal_condition = False
     mask_goal_pos = False
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    exp_name = f"{benchmark_name}-clipenc-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
     dest_dir = f"/data/karl/experiments/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
 
     benchmark_configs = {
@@ -134,7 +137,8 @@ if __name__ == "__main__":
     }
 
     dataloader_configs = {
-        "dataset_dir": "/data/karl/data/table_sim/prior_data",
+        #"dataset_dir": "/data/karl/data/table_sim/prior_data",
+        "dataset_dir": "/home/karl/data/language_table/prior_data",
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
@@ -144,7 +148,8 @@ if __name__ == "__main__":
     }
 
     policy_configs = {
-        "obs_dim": 2048 + 77 * (2 if goal_condition else 1),
+        #"obs_dim": 2048 + 77 * (2 if goal_condition else 1),
+        "obs_dim": 2048 + 512,
         "action_dim": 2,
         "hidden_dim": 512,
         "n_hidden_layers": 4,
