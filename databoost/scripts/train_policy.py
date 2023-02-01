@@ -76,7 +76,7 @@ def train(policy: nn.Module,
                     goal_cond=goal_condition
                 )
                 wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "eval_loss": eval_loss, "success_rate": success_rate})
-                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses)}, eval_loss = {eval_loss}, success_rate = {success_rate}")
+                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, eval_loss = {eval_loss:.3f}, success_rate = {success_rate}")
                 losses = []
                 # if eval_loss <= best_eval_loss:
                 if success_rate >= best_success_rate:
@@ -144,8 +144,8 @@ if __name__ == "__main__":
     # num_success_groups = int(args.n_success)
     #####
     ##### Splitsville
-    num_task_demos_per_group = 5
-    num_demo_groups = int(args.n_task_demos) // num_task_demos_per_group
+    # num_task_demos_per_group = 5
+    # num_demo_groups = int(args.n_task_demos) // num_task_demos_per_group
     # ''''''
 
     benchmark_name = "metaworld"
@@ -158,12 +158,12 @@ if __name__ == "__main__":
     # n_demo_steps = ["500", "1K", "2K", "3K", "5K", "10K", "20K", "30K", "50K"]
     # boosting_method = f"mtsac_2500K-demos_{n_demo_steps[int(args.n_groups)-1]}-1"
     # boosting_method = f"split-steps-rl_1e6-demos_perc_60"
-    boosting_method = f"split-oracle-{args.n_task_demos}-1"
-    # boosting_method = "test"
+    # boosting_method = f"split-oracle-{args.n_task_demos}-1"
+    boosting_method = "test"
     goal_condition = True
     mask_goal_pos = True
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/models/{task_name}/{boosting_method}"
+    dest_dir = f"/home/jullian-yapeter/data/models/{benchmark_name}/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -171,54 +171,8 @@ if __name__ == "__main__":
     }
 
     dataloader_configs = {
-        # "dataset_dir": [
-        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_seed/{task_name}",
-        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task_name}",
-        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/fail/{task_name}",
-        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/fail",
-        #     # f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success",
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{args.task_data}",
-        # ],
-        # "dataset_dir": [
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task}" \
-        #     for task in very_helpful_tasks
-        # ] + [
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/large_prior/success/{task}" \
-        #     for task in harmful_tasks
-        # ] + [
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
-        # ],
         "dataset_dir": [
-        ##### RL experiments
-        #     f"/home/jullian-yapeter/data/metaworld/metaworld_rl_v3_h5/{e}" for e in [4,8,12,18]
-        # ] + [
-        ##### Prior small
-        #     f"/home/jullian-yapeter/data/{benchmark_name}/grouped_prior_small/success/{group_num + 1}_of_40" \
-        #     for group_num in range(num_demo_groups)
-        # ] + [
-        ##### Prior experiments
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/fail/{group_num + 1}_of_10" \
-        #     for group_num in range(num_fail_groups)
-        # ] + [
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/success/{group_num + 1}_of_10" \
-        #     for group_num in range(num_success_groups)
-        # ] + [
-        #####
-        ##### Oracle experiments
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed/{group_num + 1}_of_10" \
-        #     for group_num in range(num_success_groups)
-        # ] + [
-        #####
-        ##### grouped exp experiments
-        #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed_exp/{task_name}/{group_num + 1}_of_9" \
-        #     for group_num in range(int(args.n_groups))
-        # ] + [
-        #####
-        ##### seed
-        #    f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
-        ##### grouped small seed
-            f"/home/jullian-yapeter/data/{benchmark_name}/grouped_seed_small/{group_num + 1}_of_40" \
-            for group_num in range(num_demo_groups)
+            f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/dataset"
         ],
         "n_demos": None,
         "batch_size": 500,
@@ -290,7 +244,7 @@ if __name__ == "__main__":
         resume=exp_name,
         project="boost",
         config=configs,
-        dir="/tmp",
+        dir="/home/jullian-yapeter/tmp",
         entity="clvr",
         notes="",
     )
@@ -333,3 +287,35 @@ if __name__ == "__main__":
         **rollout_configs
     )
     dump_video_wandb(gifs, "rollouts")
+
+
+###OLD
+    ##### RL experiments
+    #     f"/home/jullian-yapeter/data/metaworld/metaworld_rl_v3_h5/{e}" for e in [4,8,12,18]
+    # ] + [
+    ##### Prior small
+    #     f"/home/jullian-yapeter/data/{benchmark_name}/grouped_prior_small/success/{group_num + 1}_of_40" \
+    #     for group_num in range(17)
+    # ] + [
+    ##### Prior experiments
+    #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/fail/{group_num + 1}_of_10" \
+    #     for group_num in range(num_fail_groups)
+    # ] + [
+    #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_prior/success/{group_num + 1}_of_10" \
+    #     for group_num in range(num_success_groups)
+    # ] + [
+    ##### Oracle experiments
+    #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed/{group_num + 1}_of_10" \
+    #     for group_num in range(num_success_groups)
+    # ] + [
+    ##### grouped exp experiments
+    #     f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/grouped_seed_exp/{task_name}/{group_num + 1}_of_9" \
+    #     for group_num in range(int(args.n_groups))
+    # ] + [
+    ##### seed
+    #    f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark_name}/data/seed/{task_name}"
+    ##### grouped small seed
+        # f"/home/jullian-yapeter/data/{benchmark_name}/grouped_seed_small/{group_num + 1}_of_40" \
+        # for group_num in range(1)
+    ##### boosted dataset
+        # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data"

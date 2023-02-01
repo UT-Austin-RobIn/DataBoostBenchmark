@@ -64,9 +64,9 @@ def read_h5(path: str, load_imgs: bool = True) -> Dict:
     def unpack_h5_recurse(h5_data):
         data = AttrDict()
         for key in h5_data.keys():
-            if key == "infos":  # temp
-                data[key] = {}
-                continue
+            # if key == "infos":  # temp
+            #     data[key] = {}
+            #     continue
             if not load_imgs and key == "imgs":
                 continue
             elif hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
@@ -143,12 +143,16 @@ def concatenate_traj_data(trajs: Tuple[AttrDict]) -> AttrDict:
                     traj_concat[attr] = {}
                 concat_traj_data_recurse(traj_concat[attr], val, traj_len)
                 continue
-            assert isinstance(val, np.ndarray), f"attribute is of type {type(val)}"
-            assert len(val) == traj_len
+            # assert isinstance(val, np.ndarray), f"attribute {attr} is of type {type(val)}"
+            # assert len(val) == traj_len, f"len of {attr} is not {traj_len}"
+            if not hasattr(val, "__len__"): val = [val]
+            if len(val) != traj_len: val = [val for _ in range(traj_len)]
             if attr not in traj_concat:
                 traj_concat[attr] = val
-            else:
+            elif isinstance(val, np.ndarray):
                 traj_concat[attr] = np.concatenate((traj_concat[attr], val), axis=0)
+            else:
+                traj_concat[attr] += val
 
     traj_concat = AttrDict()
     for traj in trajs:

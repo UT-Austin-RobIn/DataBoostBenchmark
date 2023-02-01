@@ -443,7 +443,10 @@ class DataBoostDataset(Dataset):
                 traj_data = read_h5(path, load_imgs=load_imgs)
                 if postproc_func is not None:
                     traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                        postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
+                        postproc_func(traj_data.get("observations"), traj_data.get("rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
+                    if "goal_observations" in traj_data:
+                        traj_data["goal_observations"], _, _, _ = \
+                            postproc_func(traj_data["goal_observations"], None, None, None)
                 traj_len = self.get_traj_len(traj_data)
                 self.path_lens[path] = traj_len
                 self.limited_data_cache[path] = traj_data  # temp, for speed
@@ -455,11 +458,17 @@ class DataBoostDataset(Dataset):
         print("filtering files of sufficient length")
         for file_path in tqdm(file_paths):
             traj_data = read_h5(file_path, load_imgs=load_imgs)
-            if postproc_func is not None:
-                traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                    postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
+                if postproc_func is not None:
+                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
+                        postproc_func(traj_data.get("observations"), traj_data.get("rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
+                    if "goal_observations" in traj_data:
+                        traj_data["goal_observations"], _, _, _ = \
+                            postproc_func(traj_data["goal_observations"], None, None, None)
+                        if self.goal_condition:
+                            traj_data["observations"] = np.concatenate(
+                                (traj_data["observations"], np.repeat(traj_data["goal_observations"][None], len(traj_data["observations"]), axis=0)), axis=-1)
                 self.paths.append(file_path)
                 self.limited_data_cache[file_path] = traj_data  # temp, for speed
                 self.path_lens[file_path] = traj_len
@@ -518,20 +527,21 @@ class DataBoostDataset(Dataset):
             traj_data = read_h5(self.paths[path_id])
             if len(self.limited_data_cache) > 30000:
                 self.limited_data_cache.pop(list(self.limited_data_cache.keys())[0])
+                raise ValueError
             self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
             return traj_data
         # traj_len = self.get_traj_len(traj_data)
         traj_len = self.path_lens[self.paths[path_id]]
         traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
-        if self.goal_condition:
-            _, goal_max_idx = self.pretrain_goals[idx]
+        if self.goal_condition and "goal_observations" not in traj_data:
             # goal_idx = random.randint(goal_min_idx, goal_max_idx)
-            goal_frame = get_traj_slice(
-                traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
-            # n_repeats = traj_seq["observations"].shape[-2]  # the seq_len axis
+            # goal_frame = get_traj_slice(
+            #     traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
+            _, goal_max_idx = self.pretrain_goals[idx]
+            goal_obs = copy.deepcopy(traj_data["observations"][goal_max_idx])[None]
             traj_seq["observations"] = np.concatenate(
-                (traj_seq["observations"], np.repeat(goal_frame["observations"], self.seq_len, axis=-2)), axis=-1)
+                (traj_seq["observations"], np.repeat(goal_obs, self.seq_len, axis=-2)), axis=-1)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
