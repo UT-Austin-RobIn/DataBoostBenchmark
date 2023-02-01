@@ -91,75 +91,9 @@ if __name__ == "__main__":
     import databoost
     from databoost.models.bc import BCPolicy, TanhGaussianBCPolicy
 
-
-    # '''temp'''
-    import argparse
-    parser = argparse.ArgumentParser(
-        description='temp')
-    parser.add_argument("--n_task_demos", help="num seed groups")
-    # parser.add_argument("--n_success", help="num success prior groups")
-    # parser.add_argument("--n_seed", help="num seed groups")
-    args = parser.parse_args()
-    very_helpful_tasks = [
-        "push-back",
-        "pick-place",
-        "hand-insert"
-    ]
-    helpful_tasks = [
-        "push-back",
-        "pick-place",
-        "hand-insert",
-        "push",
-        "sweep",
-        "coffee-push",
-        "soccer",
-        "sweep-into",
-        "bin-picking",
-        "peg-insert-side"
-    ] # 10 of them
-    harmful_tasks = [
-        "lever-pull",
-        "plate-slide",
-        "assembly",
-        "pick-out-of-hole",
-        "coffee-pull",
-        "handle-pull-side",
-        "button-press-wall",
-        "reach-wall",
-        "button-press",
-        "button-press-topdown"
-    ] # 10 of them
-    from databoost.envs.metaworld.config import tasks
-    all_tasks = list(tasks.keys())
-    ##### Prior experiments
-    # num_demos_per_group = 2000
-    # num_success_groups = int(args.n_success)
-    # num_fail_groups = 10 - num_success_groups
-    ### with seed groups
-    # num_seeds_per_group = 2
-    # num_seed_groups = int(args.n_seed)
-    #####
-    ##### Oracle boost experiments
-    # num_demos_per_group = 40
-    # num_success_groups = int(args.n_success)
-    #####
-    ##### Splitsville
-    # num_task_demos_per_group = 5
-    # num_demo_groups = int(args.n_task_demos) // num_task_demos_per_group
-    # ''''''
-
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    # boosting_method = f"small_seed_{num_seed_groups * num_seeds_per_group}_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_6"
-    # boosting_method = f"success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_tanhGauss_3"
-    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_tanhGauss_6"
-    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{10*5*50}_2"
-    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{0}_2"
-    # n_demo_steps = ["500", "1K", "2K", "3K", "5K", "10K", "20K", "30K", "50K"]
-    # boosting_method = f"mtsac_2500K-demos_{n_demo_steps[int(args.n_groups)-1]}-1"
-    # boosting_method = f"split-steps-rl_1e6-demos_perc_60"
-    # boosting_method = f"split-oracle-{args.n_task_demos}-1"
-    boosting_method = "test"
+    boosting_method = "no_target"
     goal_condition = True
     mask_goal_pos = True
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
@@ -173,6 +107,7 @@ if __name__ == "__main__":
     dataloader_configs = {
         "dataset_dir": [
             f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/dataset"
+            # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data"
         ],
         "n_demos": None,
         "batch_size": 500,
@@ -290,6 +225,73 @@ if __name__ == "__main__":
 
 
 ###OLD
+
+# '''temp'''
+    # import argparse
+    # parser = argparse.ArgumentParser(
+    #     description='temp')
+    # parser.add_argument("--n_task_demos", help="num seed groups")
+    # parser.add_argument("--n_success", help="num success prior groups")
+    # parser.add_argument("--n_seed", help="num seed groups")
+    # args = parser.parse_args()
+    # very_helpful_tasks = [
+    #     "push-back",
+    #     "pick-place",
+    #     "hand-insert"
+    # ]
+    # helpful_tasks = [
+    #     "push-back",
+    #     "pick-place",
+    #     "hand-insert",
+    #     "push",
+    #     "sweep",
+    #     "coffee-push",
+    #     "soccer",
+    #     "sweep-into",
+    #     "bin-picking",
+    #     "peg-insert-side"
+    # ] # 10 of them
+    # harmful_tasks = [
+    #     "lever-pull",
+    #     "plate-slide",
+    #     "assembly",
+    #     "pick-out-of-hole",
+    #     "coffee-pull",
+    #     "handle-pull-side",
+    #     "button-press-wall",
+    #     "reach-wall",
+    #     "button-press",
+    #     "button-press-topdown"
+    # ] # 10 of them
+    # from databoost.envs.metaworld.config import tasks
+    # all_tasks = list(tasks.keys())
+    ##### Prior experiments
+    # num_demos_per_group = 2000
+    # num_success_groups = int(args.n_success)
+    # num_fail_groups = 10 - num_success_groups
+    ### with seed groups
+    # num_seeds_per_group = 2
+    # num_seed_groups = int(args.n_seed)
+    #####
+    ##### Oracle boost experiments
+    # num_demos_per_group = 40
+    # num_success_groups = int(args.n_success)
+    #####
+    ##### Splitsville
+    # num_task_demos_per_group = 5
+    # num_demo_groups = int(args.n_task_demos) // num_task_demos_per_group
+    # ''''''
+
+    # boosting_method = f"small_seed_{num_seed_groups * num_seeds_per_group}_+_success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_6"
+    # boosting_method = f"success_{int(num_success_groups * num_demos_per_group)}_+_fail_{int(num_fail_groups * num_demos_per_group)}_tanhGauss_3"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_tanhGauss_6"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{10*5*50}_2"
+    # boosting_method = f"oracle_boost_{int(num_success_groups * num_demos_per_group)}_mtsac_gc_{0}_2"
+    # n_demo_steps = ["500", "1K", "2K", "3K", "5K", "10K", "20K", "30K", "50K"]
+    # boosting_method = f"mtsac_2500K-demos_{n_demo_steps[int(args.n_groups)-1]}-1"
+    # boosting_method = f"split-steps-rl_1e6-demos_perc_60"
+    # boosting_method = f"split-oracle-{args.n_task_demos}-1"
+
     ##### RL experiments
     #     f"/home/jullian-yapeter/data/metaworld/metaworld_rl_v3_h5/{e}" for e in [4,8,12,18]
     # ] + [
@@ -319,3 +321,6 @@ if __name__ == "__main__":
         # for group_num in range(1)
     ##### boosted dataset
         # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data"
+
+
+    
