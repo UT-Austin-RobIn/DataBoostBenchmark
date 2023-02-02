@@ -1,12 +1,15 @@
+import os
 from databoost.utils.data import find_h5, read_h5, write_h5
 import numpy as np
 from tqdm import tqdm
 
 
 seed_filenames = find_h5("/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/seed")
-prior_filenames = find_h5("/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/ObservationsMasked/data/retrieved")
-dest_filename = "/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/ObservationsMasked/obs_boosted_metaworld.h5"
+prior_filenames = find_h5("/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/autonomous")
+# prior_filenames += find_h5("/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/demonstration")
+# prior_filenames = [pf for pf in prior_filenames if "pick-place-wall" not in pf]
 
+dest_filename = "/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/NoTarget-All/nt_all_metaworld.h5"
 
 unprocessed = set()
 
@@ -35,7 +38,7 @@ def concatenate_traj(dataset, traj):
                     if dataset.get(attr) is not None else val
                 continue
         unprocessed.add(attr)
-    return dataset
+    # return dataset
 
 dataset = {}
 
@@ -47,11 +50,11 @@ for filename in tqdm(seed_filenames):
     traj["seed"] = np.ones_like(traj["dones"])
     traj["terminals"][-1] = 1.
     traj["rewards"][-1] = 1.
-    attrs = list(traj.keys())
-    for attr in attrs:
-        if "goal_" not in attr and isinstance(traj[attr], np.ndarray) and len(traj[attr]) > 0:
-            traj[f"goal_{attr}"] = traj[attr][-1]
-    dataset = concatenate_traj(dataset, traj)
+    # attrs = list(traj.keys())
+    # for attr in attrs:
+    #     if "goal_" not in attr and isinstance(traj[attr], np.ndarray) and len(traj[attr]) > 0:
+    #         traj[f"goal_{attr}"] = traj[attr][-1]
+    concatenate_traj(dataset, traj)
 
 for filename in tqdm(prior_filenames):
     traj = read_h5(filename)
@@ -60,7 +63,7 @@ for filename in tqdm(prior_filenames):
     traj["rewards"] = np.zeros_like(traj["dones"])
     traj["seed"] = np.zeros_like(traj["dones"])
     traj["terminals"][-1] = 1.
-    dataset = concatenate_traj(dataset, traj)
+    concatenate_traj(dataset, traj)
 
 # add empty elem at the very end for easy slicing purposes
 for attr in dataset:
