@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = "no_target"
+    boosting_method = "NoTarget-Actions"
     goal_condition = True
     mask_goal_pos = True
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"

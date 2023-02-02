@@ -4,8 +4,8 @@ from tqdm import tqdm
 
 
 seed_filenames = find_h5("/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/seed")
-prior_filenames = find_h5("/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/BC/data/retrieved")
-dest_filename = "/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/BC/bc_boosted_metaworld.h5"
+prior_filenames = find_h5("/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/ObservationsMasked/data/retrieved")
+dest_filename = "/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/ObservationsMasked/obs_boosted_metaworld.h5"
 
 
 unprocessed = set()
