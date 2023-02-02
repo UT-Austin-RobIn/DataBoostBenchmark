@@ -19,6 +19,8 @@ from databoost.utils.data import (
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
+no_target = False
+
 
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
@@ -289,7 +291,7 @@ class DataBoostBenchmarkBase:
         '''
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
-        policy = policy.eval().to(device)
+        policy = copy.deepcopy(policy).eval().to(device)
         n_successes = 0
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
@@ -367,9 +369,16 @@ class DataBoostDataset(Dataset):
         if type(dataset_dir) in (list, tuple):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
-                file_paths += find_h5(cur_dataset_dir)
+                cur_file_paths = find_h5(cur_dataset_dir)
+                if no_target:
+                    if "seed" not in dataset_dir:
+                        cur_file_paths = [fp for fp in cur_file_paths if "pick-place-wall" not in fp]
+                file_paths += cur_file_paths
         else:
             file_paths = find_h5(dataset_dir)
+            if no_target:
+                if "seed" not in dataset_dir:
+                    file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
         #file_paths = file_paths[:1000]
         if self.seq_len is None:
             if n_demos is None: n_demos = len(file_paths)
@@ -469,7 +478,7 @@ class DataBoostDataset(Dataset):
             traj_data = self.limited_data_cache[self.paths[path_id]]
         else:
             traj_data = read_h5(self.paths[path_id])
-            if len(self.limited_data_cache) > 3000:
+            if len(self.limited_data_cache) > 30000:
                 self.limited_data_cache.pop(list(self.limited_data_cache.keys())[0])
             self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
