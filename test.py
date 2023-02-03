@@ -5,71 +5,24 @@ import cv2
 import pickle
 import numpy as np
 from tqdm import tqdm
-import os
 
-for root, dirs, files in os.walk("/data/jullian-yapeter/DataBoostBenchmark/metaworld/val"):
-    for dirpath in tqdm(dirs):
-        print(dirpath)
-        if dirpath == "movies": continue
-        file_paths = find_h5(os.path.join(root, dirpath))
-        print(len(file_paths))
-        mins = []
-        maxs = []
-        # lens = []
-        # medians = []
-        for file_path in tqdm(file_paths):
-            traj = read_h5(file_path, load_imgs=True)
-            # lens.append(traj["observations"].shape[0])
-            # traj["actions"] = np.clip(traj["actions"], -1.0, 1.0)
-            # write_h5(traj, file_path)
-            maxs.append(np.max(traj["actions"]))
-            mins.append(np.min(traj["actions"]))
-            # medians.append(np.median(traj["actions"]))
-            # medians.append(np.median(traj["actions"], axis=0))
-            # maxs.append(np.max(traj["actions"], axis=0))
-            # mins.append(np.min(traj["actions"], axis=0))
-        # print(np.mean(lens))
-        # print(f"mean: {np.mean(lengths)}")
-        # print(f"std: {np.std(lengths)}")
-        print(f"min: {np.min(mins)}")
-        print(f"max: {np.max(maxs)}")
-        # if(np.min(mins) < -1.0): raise ValueError
-        # if(np.max(maxs) > 1.0): raise ValueError
-        # print(f"median: {np.median(medians)}")
-        # print(f"min: {np.min(mins, axis=0)}")
-        # print(f"max: {np.max(maxs, axis=0)}")
-        # print(f"median: {np.median(medians, axis=0)}")
-# benchmark = databoost.get_benchmark("metaworld", mask_goal_pos=False)
-# env = benchmark.get_env("pick-place-wall")
-# obs = env.reset()
-# print(obs)
-# dataloader = env.get_seed_dataloader(seq_len=1, goal_condition=True)
-# traj = next(iter(dataloader))
-# print(traj["observations"].shape)
-# print(traj["observations"][0, 0, :39])
-# print(traj["observations"][0, 0, 39:])
-# test_env_dict = env.load_test_env()
-# print(test_env_dict["starting_ob"][-3:])
-# obs = env.reset()
-# print(obs[-3:])
-# lens = []
-# total_len = 0
-# min_len = 999
-# max_len = 0
-# min_file = ""
-# max_file = ""
-# file_paths = find_h5("/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/prior")
-# for file_path in file_paths:
-#     curr_len = len(read_h5(file_path).observations)
-#     if curr_len > max_len:
-#         max_len = curr_len
-#         max_file = file_path
-#     if curr_len < min_len:
-#         min_len = curr_len
-#         min_file = file_path
-#     total_len += curr_len
-#     lens.append(curr_len)
-# print(f"avg_len: {total_len//len(file_paths)}")
+total_len = 0
+# file_paths = find_h5("/home/karl/data/language_table/prior_data_clip")
+# file_paths += find_h5("/data/karl/data/language_table/rl_episodes")
+file_paths = find_h5("/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset")
+for file_path in tqdm(file_paths):
+    if "seed" not in file_path and "pick-place-wall" in file_path: continue
+    curr_len = len(read_h5(file_path).actions)
+    # if curr_len > max_len:
+    #     max_len = curr_len
+    #     max_file = file_path
+    # if curr_len < min_len:
+    #     min_len = curr_len
+    #     min_file = file_path
+    total_len += curr_len
+    # lens.append(curr_len)
+print(f"total_len: {total_len}")
+print(f"avg_len: {total_len//len(file_paths)}")
 # print(f"max_len: {max_len}, {max_file}")
 # print(f"min_len: {min_len}, {min_file}")
 # print(f"std: {np.std(lens)}")

@@ -1,14 +1,16 @@
 from databoost.base import DataBoostBenchmarkBase
-from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
-from databoost.envs.calvin import DataBoostBenchmarkCalvin
+# from databoost.envs.language_table import DataBoostBenchmarkLanguageTable
+#from databoost.envs.antmaze import DataBoostBenchmarkAntMaze
+#from databoost.envs.calvin import DataBoostBenchmarkCalvin
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 
 
 # dictionary of DataBoost's benchmark names and corresponding benchmark objects
 benchmarks = {
+    # "language_table": DataBoostBenchmarkLanguageTable,
     "metaworld": DataBoostBenchmarkMetaworld,
-    "antmaze": DataBoostBenchmarkAntMaze,
-    "calvin": DataBoostBenchmarkCalvin
+    # "antmaze": DataBoostBenchmarkAntMaze,
+    # "calvin": DataBoostBenchmarkCalvin
 }
 
 

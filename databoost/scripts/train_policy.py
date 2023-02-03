@@ -59,29 +59,37 @@ def train(policy: nn.Module,
             optimizer.step()
             step += 1
             pbar.update(1)
-            if (step % eval_period) == 0:                
-                print(f"evaluating step {step} with {eval_episodes} episodes")
-                eval_loss = benchmark.validate(
-                    task_name=task_name,
-                    policy=policy,
-                    n_episodes=eval_episodes,
-                    goal_cond=goal_condition
-                )
-                success_rate, _ = benchmark.evaluate(
-                    policy=policy,
-                    render=False,
-                    task_name=task_name,
-                    n_episodes=100,
-                    max_traj_len=500,
-                    goal_cond=goal_condition
-                )
-                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "eval_loss": eval_loss, "success_rate": success_rate})
-                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, eval_loss = {eval_loss:.3f}, success_rate = {success_rate}")
+            if (step % eval_period) == 0:
+                torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-{step}.pt"))  
+                if eval_episodes <= 0:
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
+                    # continue
+                # eval_loss = benchmark.validate(
+                #     task_name=task_name,
+                #     policy=policy,
+                #     n_episodes=eval_episodes,
+                #     goal_cond=goal_condition
+                # )
+                if step in (25000, 50000, 100000, 150000, 200000):
+                    print(f"evaluating step {step} with {eval_episodes} episodes")
+                    success_rate, _ = benchmark.evaluate(
+                        policy=policy,
+                        render=False,
+                        task_name=task_name,
+                        n_episodes=eval_episodes,
+                        max_traj_len=500,
+                        goal_cond=goal_condition
+                    )
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
+                    if success_rate >= best_success_rate:
+                        torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                        best_success_rate = success_rate
+                else:
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
                 losses = []
-                # if eval_loss <= best_eval_loss:
-                if success_rate >= best_success_rate:
-                    torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                    best_success_rate = success_rate
             if step >= n_steps: break
     pbar.close()
 
@@ -93,11 +101,11 @@ if __name__ == "__main__":
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = "NoTarget-Actions"
+    boosting_method = "NoTarget-ObservationsMasked"
     goal_condition = True
     mask_goal_pos = True
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/home/jullian-yapeter/data/models/{benchmark_name}/{task_name}/{boosting_method}"
+    exp_name = f"{benchmark_name}-1-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
+    dest_dir = f"/home/jullian-yapeter/data/models/{benchmark_name}/{task_name}/{boosting_method}-1"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -106,8 +114,11 @@ if __name__ == "__main__":
 
     dataloader_configs = {
         "dataset_dir": [
-            f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/dataset"
-            # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data"
+            # "/home/karl/data/language_table/seed_task_separate",
+            # "/home/karl/data/language_table/prior_data_clip",
+            # "/data/karl/data/language_table/rl_episodes"
+            f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
+            # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
         ],
         "n_demos": None,
         "batch_size": 500,
@@ -145,10 +156,10 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 5e3,
+        "eval_period": 1e3,
         "eval_episodes": 300,
         "max_traj_len": 500,
-        "n_steps": 200000,
+        "n_steps": 2e5,
         "goal_condition": goal_condition
     }
 
