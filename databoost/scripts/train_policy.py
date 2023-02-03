@@ -70,29 +70,37 @@ def train(policy: nn.Module,
             optimizer.step()
             step += 1
             pbar.update(1)
-            if (step % eval_period) == 0:                
-                print(f"evaluating step {step} with {eval_episodes} episodes")
+            if (step % eval_period) == 0:
+                torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-{step}.pt"))  
+                if eval_episodes <= 0:
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
+                    # continue
                 # eval_loss = benchmark.validate(
                 #     task_name=task_name,
                 #     policy=policy,
                 #     n_episodes=eval_episodes,
                 #     goal_cond=goal_condition
                 # )
-                success_rate, _ = benchmark.evaluate(
-                    policy=policy,
-                    render=False,
-                    task_name=task_name,
-                    n_episodes=eval_episodes,
-                    max_traj_len=500,
-                    goal_cond=goal_condition
-                )
-                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
-                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
+                if (step in (5000, 125000, 250000, 375000)) == 0:
+                    print(f"evaluating step {step} with {eval_episodes} episodes")
+                    success_rate, _ = benchmark.evaluate(
+                        policy=policy,
+                        render=False,
+                        task_name=task_name,
+                        n_episodes=eval_episodes,
+                        max_traj_len=120,
+                        goal_cond=goal_condition
+                    )
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
+                    if success_rate >= best_success_rate:
+                        torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                        best_success_rate = success_rate
+                else:
+                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
                 losses = []
-                # if eval_loss <= best_eval_loss:
-                if success_rate >= best_success_rate:
-                    torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                    best_success_rate = success_rate
             if step >= n_steps: break
     pbar.close()
     return policy
@@ -103,10 +111,10 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "test7"
+    boosting_method = "BC-Mixed"
     goal_condition = False
     mask_goal_pos = False
-    exp_name = f"{benchmark_name}-clipenc_dummy-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}-4"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
     dest_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
 
     benchmark_configs = {
@@ -116,9 +124,15 @@ if __name__ == "__main__":
     dataloader_configs = {
         #"dataset_dir": "/data/karl/data/table_sim/prior_data_clip",
         # "dataset_dir": "/home/karl/data/language_table/prior_data_clip",
-        "dataset_dir": "/home/karl/data/language_table/seed_task_separate",
+        "dataset_dir": [
+            # "/home/karl/data/language_table/seed_task_separate",
+            "/home/karl/data/language_table/prior_data_clip",
+            "/data/karl/data/language_table/rl_episodes"
+            # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
+            # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
+        ],
         "n_demos": None,
-        "batch_size": 500,
+        "batch_size": 128,
         "seq_len": 1,
         "shuffle": True,
         "load_imgs": False,
@@ -142,7 +156,7 @@ if __name__ == "__main__":
                 "flat_dim": 2
             })
         }),
-        "hidden_sizes": [400, 400, 400],
+        "hidden_sizes": [512, 512, 512, 512],
         "hidden_nonlinearity": nn.ReLU,
         "output_nonlinearity": None,
         "min_std": np.exp(-20.),
@@ -154,24 +168,24 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 500,
-        "eval_episodes": 1,
-        "max_traj_len": 200,
-        "n_steps": 1000,
+        "eval_period": 1e3,
+        "eval_episodes": 40,
+        "max_traj_len": 120,
+        "n_steps": 5e5,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 1,
-        "max_traj_len": 500,
+        "n_episodes": 50,
+        "max_traj_len": 120,
         "goal_cond": goal_condition,
     }
 
     rollout_configs = {
         "task_name": task_name,
-        "n_episodes": 3,
-        "max_traj_len": 500,
+        "n_episodes": 10,
+        "max_traj_len": 120,
         "goal_cond": goal_condition,
     }
 
@@ -205,28 +219,28 @@ if __name__ == "__main__":
                    benchmark=benchmark,
                    **train_configs)
 
-    final_policy = copy.deepcopy(policy)
-    torch.save(final_policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
-    success_rate, _ = benchmark.evaluate(
-        policy=final_policy,
-        render=False,
-        **eval_configs
-    )
-    print(f"final success_rate: {success_rate}")
-    wandb.log({"final_success_rate": success_rate})
+    # final_policy = copy.deepcopy(policy)
+    # torch.save(final_policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    # success_rate, _ = benchmark.evaluate(
+    #     policy=final_policy,
+    #     render=False,
+    #     **eval_configs
+    # )
+    # print(f"final success_rate: {success_rate}")
+    # wandb.log({"final_success_rate": success_rate})
 
-    best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
-    success_rate, _ = benchmark.evaluate(
-        policy=best_policy,
-        render=False,
-        **eval_configs
-    )
-    print(f"best success_rate: {success_rate}")
-    wandb.log({"best_success_rate": success_rate})
+    # best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
+    # success_rate, _ = benchmark.evaluate(
+    #     policy=best_policy,
+    #     render=False,
+    #     **eval_configs
+    # )
+    # print(f"best success_rate: {success_rate}")
+    # wandb.log({"best_success_rate": success_rate})
 
     '''generate sample policy rollouts'''
     success_rate, gifs = benchmark.evaluate(
-        policy=best_policy,
+        policy=final_policy,
         render=True,
         **rollout_configs
     )

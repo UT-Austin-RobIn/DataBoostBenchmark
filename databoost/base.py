@@ -20,6 +20,7 @@ from databoost.utils.data import (
 )
 
 no_target = False
+only_target = False
 
 
 class DataBoostEnvWrapper(gym.Wrapper):
@@ -366,19 +367,25 @@ class DataBoostDataset(Dataset):
         self.paths = []
         self.path_lens = {}
 
+        # ######### Load in handcrafted files
+        # file_paths = read_json("databoost/envs/language_table/selected_seeds.json")
+        # #########
+
         if type(dataset_dir) in (list, tuple):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
                 cur_file_paths = find_h5(cur_dataset_dir)
-                if no_target:
+                if no_target and "metaworld" in dataset_dir:
                     if "seed" not in dataset_dir:
                         cur_file_paths = [fp for fp in cur_file_paths if "pick-place-wall" not in fp]
                 file_paths += cur_file_paths
         else:
             file_paths = find_h5(dataset_dir)
-            if no_target:
+            if no_target and "metaworld" in dataset_dir:
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
+
+        print(f"found {len(file_paths)} files")
         #file_paths = file_paths[:1000]
         if self.seq_len is None:
             if n_demos is None: n_demos = len(file_paths)
@@ -411,9 +418,10 @@ class DataBoostDataset(Dataset):
                     postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
 
             # filter by instruction
-            #inst = traj_data["infos"]["instruction"][0]
-            #instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-            #if "separate" not in instruction_str: continue
+            if only_target and "language_table" in file_path:
+                inst = traj_data["infos"]["instruction"][0]
+                instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
+                if "separate" not in instruction_str: continue
             #import shutil
             #if len(self.paths) < 100:
             #    shutil.copyfile(file_path, "/home/karl/data/language_table/seed_task_separate/seed_episode_{}.h5".format(len(self.paths)))
@@ -492,8 +500,10 @@ class DataBoostDataset(Dataset):
             goal_frame = get_traj_slice(
                 traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
             # n_repeats = traj_seq["observations"].shape[-2]  # the seq_len axis
+            if goal_frame["observations"].shape != traj_seq["observations"].shape:
+                goal_frame["observations"] = np.repeat(goal_frame["observations"], self.seq_len, axis=-2)
             traj_seq["observations"] = np.concatenate(
-                (traj_seq["observations"], np.repeat(goal_frame["observations"], self.seq_len, axis=-2)), axis=-1)
+                (traj_seq["observations"], goal_frame["observations"]), axis=-1)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
