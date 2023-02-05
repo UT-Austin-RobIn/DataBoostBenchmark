@@ -19,7 +19,7 @@ random.seed(42)
 # parser.add_argument("--n_window", help="num success prior groups")
 # args = parser.parse_args()
 
-policy_dir = "/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC_Mixed"
+policy_filename = "/home/sdass/boosting/models/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt"
 benchmark = "language_table"
 task = "separate"
 # n_chkpt = int(500000 * 0.25)
@@ -29,19 +29,19 @@ n_period = 2e3
 n_episodes = 20
 
 benchmark = databoost.get_benchmark(benchmark)
-policy_filenames = os.listdir(policy_dir)
+# policy_filenames = os.listdir(policy_dir)
 success_rates = []
 for idx in range(n_window):
-    chkpt = int(n_chkpt - idx * n_period)
-    policy_filename = None
-    for fn in policy_filenames:
-        if f"-{chkpt}.pt" in fn:
-            policy_filename = os.path.join(policy_dir, fn)
-            break
-    if policy_filename is None:
-        print(f"chkpt {chkpt} not found")
-        raise ValueError
-    print(f"evaluating {policy_filename} on {task} task")
+    # chkpt = int(n_chkpt - idx * n_period)
+    # policy_filename = None
+    # for fn in policy_filenames:
+    #     if f"-{chkpt}.pt" in fn:
+    #         policy_filename = os.path.join(policy_dir, fn)
+    #         break
+    # if policy_filename is None:
+    #     print(f"chkpt {chkpt} not found")
+    #     raise ValueError
+    # print(f"evaluating {policy_filename} on {task} task")
     policy = torch.load(policy_filename)
     # initialize appropriate benchmark with corresponding task
     # evaluate the policy using the benchmark
