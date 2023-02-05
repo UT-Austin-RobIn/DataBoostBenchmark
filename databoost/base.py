@@ -438,6 +438,10 @@ class DataBoostDataset(Dataset):
             if no_target:
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
+        #####
+        print("Retrieving only oracle")
+        file_paths = [fp for fp in file_paths if "pick-place-wall" in fp]
+        #####
         if self.seq_len is None:
             if n_demos is None: n_demos = len(file_paths)
             # if no seq_len is given, no need to proceed with slicing.

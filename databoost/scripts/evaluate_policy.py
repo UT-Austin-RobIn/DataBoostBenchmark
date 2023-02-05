@@ -2,11 +2,12 @@ import os
 import random
 
 import torch
+import numpy as np
 
 import databoost
 
 
-random.seed(42)
+random.seed(1)
 
 
 # train/load a policy
@@ -16,14 +17,14 @@ random.seed(42)
 # parser.add_argument("--n_window", help="num success prior groups")
 # args = parser.parse_args()
 
-policy_dir = "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/models/pick-place-wall/NoTarget-BC"
+policy_dir = "/home/jullian-yapeter/data/models/metaworld/pick-place-wall/FinalObsBoost"
 benchmark = "metaworld"
 task = "pick-place-wall"
 goal_cond = True
-n_chkpt = int(200000 * 1)
+n_chkpt = int(200000 * 0.125)
 n_window = 10
 n_period = 1e3
-n_episodes = 100
+n_episodes = 300
 
 benchmark = databoost.get_benchmark(benchmark)
 policy_filenames = os.listdir(policy_dir)

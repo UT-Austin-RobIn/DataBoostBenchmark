@@ -15,8 +15,8 @@ from databoost.utils.data import dump_video_wandb
 from databoost.utils.general import AttrDict
 
 
-random.seed(83)
-np.random.seed(83)
+random.seed(92)
+np.random.seed(92)
 
 
 def train(policy: nn.Module,
@@ -64,31 +64,31 @@ def train(policy: nn.Module,
                 if eval_episodes <= 0:
                     wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
                     print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
-                    # continue
+                    continue
                 # eval_loss = benchmark.validate(
                 #     task_name=task_name,
                 #     policy=policy,
                 #     n_episodes=eval_episodes,
                 #     goal_cond=goal_condition
                 # )
-                if step in (25000, 50000, 100000, 150000, 200000):
-                    print(f"evaluating step {step} with {eval_episodes} episodes")
-                    success_rate, _ = benchmark.evaluate(
-                        policy=policy,
-                        render=False,
-                        task_name=task_name,
-                        n_episodes=eval_episodes,
-                        max_traj_len=500,
-                        goal_cond=goal_condition
-                    )
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
-                    if success_rate >= best_success_rate:
-                        torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                        best_success_rate = success_rate
-                else:
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
+                # if step in (25000, 50000, 100000, 150000, 200000):
+                print(f"evaluating step {step} with {eval_episodes} episodes")
+                success_rate, _ = benchmark.evaluate(
+                    policy=policy,
+                    render=False,
+                    task_name=task_name,
+                    n_episodes=eval_episodes,
+                    max_traj_len=500,
+                    goal_cond=goal_condition
+                )
+                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
+                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
+                if success_rate >= best_success_rate:
+                    torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                    best_success_rate = success_rate
+                # else:
+                #     wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                #     print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
                 losses = []
             if step >= n_steps: break
     pbar.close()
@@ -101,11 +101,11 @@ if __name__ == "__main__":
 
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    boosting_method = "NoTarget-ObservationsMasked"
+    boosting_method = "random"
     goal_condition = True
     mask_goal_pos = True
-    exp_name = f"{benchmark_name}-1-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/home/jullian-yapeter/data/models/{benchmark_name}/{task_name}/{boosting_method}-1"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
+    dest_dir = f"/home/jullian-yapeter/data/models/{benchmark_name}/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -114,10 +114,14 @@ if __name__ == "__main__":
 
     dataloader_configs = {
         "dataset_dir": [
+            # "/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/NoTarget-ObservationsMasked/data"
+            "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/demonstration",
+            "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/seed",
+            # "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/autonomous",
             # "/home/karl/data/language_table/seed_task_separate",
             # "/home/karl/data/language_table/prior_data_clip",
             # "/data/karl/data/language_table/rl_episodes"
-            f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
+            # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
             # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
         ],
         "n_demos": None,
