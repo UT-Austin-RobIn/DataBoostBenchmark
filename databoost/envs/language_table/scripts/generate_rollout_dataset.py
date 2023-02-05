@@ -1,5 +1,6 @@
 import clip
 import tqdm
+import sys
 import torch
 import torchvision
 import os
@@ -14,7 +15,8 @@ from databoost.utils.data import write_h5
 from language_table.environments import blocks
 from language_table.environments import language_table
 from language_table.environments.rewards import (
-    block2block, block2absolutelocation, block2block_relative_location, block2relativelocation, separate_blocks)
+    block2block, block2absolutelocation, block2block_relative_location, block2relativelocation, separate_blocks,
+    point2block, block1_to_corner)
 from r3m import load_r3m
 
 
@@ -40,6 +42,8 @@ class DatasetSaver:
                        block2absolutelocation.BlockToAbsoluteLocationReward,
                        block2block_relative_location.BlockToBlockRelativeLocationReward,
                        block2relativelocation.BlockToRelativeLocationReward,
+                       point2block.PointToBlockReward,
+                       block1_to_corner.Block1ToCornerLocationReward,
                        separate_blocks.SeparateBlocksReward]
         self._envs = [language_table.LanguageTable(
             block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
@@ -177,7 +181,7 @@ class DatasetSaver:
             write_h5(traj, os.path.join(dest_dir, f"episode_{i}.h5"))
 
 if __name__ == "__main__":
-    BATCH = 1
+    BATCH = sys.argv[1]
     DatasetSaver(BATCH).generate_dataset(
         policy_checkpt='/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC_Mixed/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt',
         dest_dir=f'/data/karl/data/table_sim/rollout_data/batch{BATCH}',
