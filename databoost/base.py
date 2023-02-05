@@ -190,7 +190,31 @@ class DataBoostEnvWrapper(gym.Wrapper):
             test_env_dict = pickle.load(f)
         self.env = test_env_dict["env"]
         test_env_dict.pop("env")
-        return test_env_dict
+        return test_env_dict\
+    
+    # def step(self, action):
+    #     obs, reward, done, info = self.env.step(action)
+    #     if len(obs.shape) == 1:
+    #         obs[-3:] = 0.0
+    #     elif len(obs.shape) == 2:
+    #         obs[:, -3:] = 0.0
+    #     elif len(obs.shape) == 3:
+    #         obs[:, :, -3:] = 0.0
+    #     else:
+    #         raise ValueError
+    #     return obs, reward, done, info
+
+    # def reset(self):
+    #     obs = self.env.reset()
+    #     if len(obs.shape) == 1:
+    #         obs[-3:] = 0.0
+    #     elif len(obs.shape) == 2:
+    #         obs[:, -3:] = 0.0
+    #     elif len(obs.shape) == 3:
+    #         obs[:, :, -3:] = 0.0
+    #     else:
+    #         raise ValueError
+    #     return obs
 
 
 class DataBoostBenchmarkBase:
@@ -329,7 +353,6 @@ class DataBoostDataset(Dataset):
             paths [List[str]]: list of h5 file paths to load in
             slices [List[Tuple[int]]]: list of tuples (path, start_idx, end_idx)
         '''
-        self.limited_data_cache = {}
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         file_path = find_h5(dataset_dir)[0]
@@ -340,6 +363,9 @@ class DataBoostDataset(Dataset):
         
         self.buffer_seed = get_traj_slice(traj_data, self.get_traj_len(traj_data), seed_idx[0], seed_idx[-1]+2)
         self.buffer_prior = get_traj_slice(traj_data, self.get_traj_len(traj_data), prior_idx[0], prior_idx[-1])
+
+        # mask rewards
+        self.buffer_seed['observations'][:, -3:] = 0.0
         
         self.seed_len = self.get_traj_len(self.buffer_seed)
         self.prior_len = self.get_traj_len(self.buffer_prior)
@@ -360,7 +386,7 @@ class DataBoostDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict:
         r = np.random.random()
-        if r < self.seed_sample_ratio:
+        if self.prior_len == 0 or r < self.seed_sample_ratio:
             if self.terminal_sample_ratio and r < self.terminal_sample_ratio:
                 seed_idx = np.random.choice(self.seed_reward_states)
             else:

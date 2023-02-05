@@ -35,6 +35,7 @@ def train(iql_policy,
           max_traj_len: int,
           n_epochs: int,
           n_epoch_cycles: int,
+          max_global_steps: int, 
           n_save_best: int,
           goal_condition: bool = False):
 
@@ -57,36 +58,45 @@ def train(iql_policy,
                         logs[k] = logs[k] + log[k] if k in logs else log[k]
                 
                 global_step += 1
+
+                if global_step % eval_period == 0:
+                    print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
+                    success_rate, gifs = benchmark.evaluate(
+                        task_name=task_name,
+                        policy=iql_policy,
+                        n_episodes=eval_episodes,
+                        max_traj_len=max_traj_len,
+                        goal_cond=goal_condition,
+                        render=False
+                    )
+
+                    wandb.log({"success_rate": success_rate}, step=global_step)
+                    print(f"epoch {epoch}: success_rate = {success_rate}")
+
+                    # saving the top 'n_save_best' policies
+                    if success_rate >= best_success_rate[min_success_best]:
+                        torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-best{min_success_best}.pt"))
+                        best_success_rate[min_success_best] = success_rate
+                        min_success_best = np.argmin(best_success_rate)
+
+                    torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
             
+                if global_step >= max_global_steps:
+                    break
+
             for k in logs:
-                if 'values_seed/' == k[:12] or 'values_prior/' == k[:13]:
+                if ('values_seed/' == k[:12] or 'values_prior/' == k[:13]) and agg[k] > 0:
                     logs[k] /= agg[k]
             logs['values_seed/num_samples'] = agg['values_seed/num_samples']/(agg['values_seed/num_samples'] + agg['values_prior/num_samples'])
             logs['values_prior/num_samples'] = 1 - logs['values_seed/num_samples']
             logs['epochs'] = epoch*n_epoch_cycles + cycle
             wandb.log(logs, step=global_step)
 
-        if epoch % eval_period == 0:
-            print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
-            success_rate, gifs = benchmark.evaluate(
-                task_name=task_name,
-                policy=iql_policy,
-                n_episodes=eval_episodes,
-                max_traj_len=max_traj_len,
-                goal_cond=goal_condition,
-                render=False
-            )
+            if global_step >= max_global_steps:
+                break
+        if global_step >= max_global_steps:
+            break
 
-            wandb.log({"success_rate": success_rate}, step=global_step)
-            print(f"epoch {epoch}: success_rate = {success_rate}")
-
-            # saving the top 'n_save_best' policies
-            if success_rate >= best_success_rate[min_success_best]:
-                torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-best{min_success_best}.pt"))
-                best_success_rate[min_success_best] = success_rate
-                min_success_best = np.argmin(best_success_rate)
-
-            torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
     return iql_policy
 
 if __name__ == "__main__":
@@ -96,25 +106,26 @@ if __name__ == "__main__":
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
     boosting_method = ""
-    version = "success50_fail50"
-    exp_name = f"{benchmark_name}-{task_name}-{version}-{sys.argv[1]}"
+    # version = "pick_place_wall/rl_30_seed5"
+    version = "nt_metaworld_boosting/nt_all_metaworld"
+    exp_name = f"{benchmark_name}-{task_name}-{version.replace('/', '_')}-{sys.argv[1]}"
     dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/all"
     goal_condition = False
 
     dataloader_configs = {
-        "dataset_dir": f"/home/sdass/boosting/data/pick_place_wall/{version}",
+        "dataset_dir": f"/home/sdass/boosting/data/{version}",
         "n_demos": None,
         "batch_size": 256,
         "seq_len": 2,
         "shuffle": True,
         "goal_condition": goal_condition,
-        "seed_sample_ratio": 0.5,
+        "seed_sample_ratio": None,#0.5,
         "terminal_sample_ratio": 0.01
     }
 
     obs_dim = 39 * (2 if goal_condition else 1)
     action_dim = 4
-    qf_kwargs = dict(hidden_sizes=[512, 512, ], layer_norm=True)
+    qf_kwargs = dict(hidden_sizes=[512, 512], layer_norm=True)
 
     policy_configs = {
         "policy": GaussianPolicy(
@@ -173,18 +184,19 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 5,
-        "eval_episodes": 20,
+        "eval_period": 2500,
+        "eval_episodes": 100,
         "max_traj_len": 500,
-        "n_epochs": 150, #iql : 1000
-        "n_epoch_cycles": 1,
+        "n_epochs": 10000, #iql : 1000
+        "n_epoch_cycles": 5000,
         "n_save_best": 3,
+        "max_global_steps": 102501,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 300,
+        "n_episodes": 100,
         "max_traj_len": 500,
         "goal_cond": goal_condition
     }
@@ -237,10 +249,10 @@ if __name__ == "__main__":
         print(f"best success_rate: {success_rate}")
         wandb.log({f"best_success_rate{i}": success_rate})
 
-        '''generate sample policy rollouts'''
-        success_rate, gifs = benchmark.evaluate(
-            policy=iql_policy,
-            render=True,
-            **rollout_configs
-        )
-        dump_video_wandb(gifs, "rollouts{i}")
+        # '''generate sample policy rollouts'''
+        # success_rate, gifs = benchmark.evaluate(
+        #     policy=iql_policy,
+        #     render=True,
+        #     **rollout_configs
+        # )
+        # dump_video_wandb(gifs, "rollouts{i}")

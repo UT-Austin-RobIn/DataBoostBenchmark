@@ -3,7 +3,7 @@ from databoost.utils.data import find_h5, read_h5, write_h5
 
 def recursively_copy_h5py(d, f):
     for k in f:
-        if k == 'imgs':
+        if k == 'imgs' or k in ['info', 'infos']:
             continue
         if hasattr(f[k], "keys") and callable(f[k].keys):
             d[k] = recursively_copy_h5py(d[k], f[k]) if k in d else recursively_copy_h5py({}, f[k])
@@ -23,25 +23,26 @@ if __name__ == '__main__':
     # dataset_dir = ['/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/seed/pick-place-wall' , 
     #                 '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/prior/success']
     
-    dataset_dir = [
-                    '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/seed/pick-place-wall',
+    #ALWAYS HAVE SEED AS FIRST TRAJECTORIES
+    # dataset_dir = [
+                    # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/seed/pick-place-wall',
 
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/1_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/2_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/3_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/4_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/5_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/1_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/2_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/3_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/4_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/5_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/6_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/7_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/8_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/9_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/success/10_of_10' ,
 
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/1_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/2_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/3_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/4_of_10' ,
-                     '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/5_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/1_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/2_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/3_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/4_of_10' ,
+                    #  '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/5_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/6_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/7_of_10' ,
                     # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_prior/fail/8_of_10' ,
@@ -62,7 +63,28 @@ if __name__ == '__main__':
                    # # '/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/grouped_seed/10_of_10' ,
                     
 
-                ]
+                # ]
+
+    dataset_dir = [
+                        # Seed Data
+                        "/home/sdass/boosting/data/metaworld/grouped_seed_small/1_of_40",
+                        # "/home/sdass/boosting/data/metaworld/grouped_seed_small/2_of_40",
+
+                        # RL Data
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/0", 
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/2", 
+                        "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/4", 
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/6", 
+                        "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/8", 
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/10", 
+                        "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/12", 
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/14", 
+                        # "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/16",
+                        "/home/sdass/boosting/data/metaworld/metaworld_rl_v3_h5/18", 
+                    ]
+    dataset_dir += [f"/home/sdass/boosting/data/metaworld/grouped_prior_small/success/{i}_of_40" for i in range(1, 18)]
+    dataset_dir += [f"/home/sdass/boosting/data/metaworld/grouped_prior_ppw_small/{i}_of_40" for i in range(2, 3)]
+
 
     all_data = {}
     for cur_dataset_dir in dataset_dir:
@@ -74,7 +96,7 @@ if __name__ == '__main__':
             all_data = recursively_copy_h5py(all_data, f)
             
             # add reward 1 at completion to only seed dataset
-            if '/seed/' in cur_dataset_dir:
+            if 'seed' in cur_dataset_dir:
                 sr = np.copy(f['dones'])
                 seed_bool = np.ones_like(f['dones'])
             else:
@@ -107,4 +129,4 @@ if __name__ == '__main__':
 
     print(np.where(all_data['dones']))
     print(np.sum(all_data['seed']), len(all_data['dones']))
-    write_h5(all_data, '/home/sdass/boosting/data/pick_place_wall/success50_fail50/success50_fail50.h5')
+    write_h5(all_data, '/home/sdass/boosting/data/pick_place_wall/rl_30_seed5/rl_30_seed5.h5')
