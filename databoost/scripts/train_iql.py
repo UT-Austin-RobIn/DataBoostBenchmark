@@ -1,6 +1,7 @@
 # import argparse
 import clip
 import os
+import sys
 import random
 import copy
 
@@ -15,13 +16,15 @@ import wandb
 from databoost.base import DataBoostBenchmarkBase
 from databoost.utils.general import AttrDict
 from databoost.utils.data import dump_video_wandb
+from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
+from databoost.models.iql.iql import IQLModel
 
 
 np.random.seed(42)
 random.seed(42)
 
-
-def train(policy: nn.Module,
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+def train(iql_policy,
           dataloader: DataLoader,
           benchmark: DataBoostBenchmarkBase,
           exp_name: str,
@@ -31,79 +34,71 @@ def train(policy: nn.Module,
           eval_period: int,
           eval_episodes: int,
           max_traj_len: int,
-          n_steps: int,
+          n_epochs: int,
+          n_epoch_cycles: int,
+          max_global_steps: int, 
+          n_save_best: int,
           goal_condition: bool = False):
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    policy = policy.train().to(device)
-    optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
-    best_success_rate = 0
+    best_success_rate = [-1 for i in range(3)]
+    min_success_best = 0
 
-    model, _ = clip.load("ViT-B/32", device=device)
+    global_step = iql_policy._n_train_steps_total
+    for epoch in tqdm(range(int(n_epochs))):
+        for cycle in range(n_epoch_cycles):
+            logs, agg = {}, {}
+            for batch_num, batch in enumerate(dataloader):
+                log = iql_policy.train_from_torch(batch)
+                
+                for k in log:
+                    if 'losses/' == k[:7] or 'values/' == k[:7]:
+                        logs[k] = logs[k]+(log[k]/len(dataloader)) if k in logs else log[k]/len(dataloader)
+                    else:
+                        parent = k.split('/')[0]
+                        agg[k] = agg[k] + log[parent + '/num_samples'] if k in agg else log[parent + '/num_samples']
+                        logs[k] = logs[k] + log[k] if k in logs else log[k]
+                
+                global_step += 1
 
-    step = 0
-    epoch = 0
-    losses = []
-
-    n_steps = int(n_steps)
-    pbar = tqdm(total=n_steps)
-    while(step < n_steps):
-        epoch += 1
-        for batch_num, traj_batch in enumerate(dataloader):
-            optimizer.zero_grad()
-            obs_batch = traj_batch["observations"].to(device)
-            obs_batch = obs_batch[:, 0, :].float()  # remove the window dimension, since just 1
-
-            # append language instruction to observation
-            #decoded_instructions = [bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-            #                        for inst in traj_batch['infos']['instruction'][:, 0].data.cpu().numpy()]
-            #text_tokens = clip.tokenize(decoded_instructions).to(device)#.float()  # [batch, 77]
-            #text_tokens = model.encode_text(text_tokens)
-            #obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
-
-            pred_action_dist, _ = policy(obs_batch)
-            action_batch = traj_batch["actions"].to(device)
-            action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
-            loss = policy.loss(pred_action_dist, action_batch)
-            losses.append(loss.item())
-            loss.backward()
-            optimizer.step()
-            step += 1
-            pbar.update(1)
-            if (step % eval_period) == 0:
-                torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-{step}.pt"))  
-                if eval_episodes <= 0:
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
-                    # continue
-                # eval_loss = benchmark.validate(
-                #     task_name=task_name,
-                #     policy=policy,
-                #     n_episodes=eval_episodes,
-                #     goal_cond=goal_condition
-                # )
-                if step in (5000, 125000, 250000, 375000, 500000):
-                    print(f"evaluating step {step} with {eval_episodes} episodes")
-                    success_rate, _ = benchmark.evaluate(
-                        policy=policy,
-                        render=False,
+                if global_step % eval_period == 0:
+                    print(f"evaluating epoch {epoch} with {eval_episodes} episodes")
+                    success_rate, gifs = benchmark.evaluate(
                         task_name=task_name,
+                        policy=iql_policy,
                         n_episodes=eval_episodes,
-                        max_traj_len=120,
-                        goal_cond=goal_condition
+                        max_traj_len=max_traj_len,
+                        goal_cond=goal_condition,
+                        render=False
                     )
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
-                    if success_rate >= best_success_rate:
-                        torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                        best_success_rate = success_rate
-                else:
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
-                losses = []
-            if step >= n_steps: break
-    pbar.close()
-    return policy
+
+                    wandb.log({"success_rate": success_rate}, step=global_step)
+                    print(f"epoch {epoch}: success_rate = {success_rate}")
+
+                    # saving the top 'n_save_best' policies
+                    if success_rate >= best_success_rate[min_success_best]:
+                        torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-best{min_success_best}.pt"))
+                        best_success_rate[min_success_best] = success_rate
+                        min_success_best = np.argmin(best_success_rate)
+
+                    torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
+            
+                if global_step >= max_global_steps:
+                    break
+
+            for k in logs:
+                if ('values_seed/' == k[:12] or 'values_prior/' == k[:13]) and agg[k] > 0:
+                    logs[k] /= agg[k]
+            logs['values_seed/num_samples'] = agg['values_seed/num_samples']/(agg['values_seed/num_samples'] + agg['values_prior/num_samples'])
+            logs['values_prior/num_samples'] = 1 - logs['values_seed/num_samples']
+            logs['epochs'] = epoch*n_epoch_cycles + cycle
+            wandb.log(logs, step=global_step)
+
+            if global_step >= max_global_steps:
+                break
+        if global_step >= max_global_steps:
+            break
+
+    return iql_policy
 
 if __name__ == "__main__":
     import databoost
@@ -111,11 +106,11 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "BC"
+    boosting_method = "IQL"
     goal_condition = False
     mask_goal_pos = False
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-{sys.argv[1]}"
+    dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -133,18 +128,21 @@ if __name__ == "__main__":
         # "/data/karl/data/language_table/rl_episodes"
         # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
         # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
-        "dataset_dir": [
-            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_0/data/seed",
-        ] + [
-            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_{idx}/data/retrieved" \
-            for idx in range(5)
-        ],
+        "dataset_dir": ['/home/sdass/boosting/data/langtable/seed/', '/home/sdass/boosting/data/langtable/retrieved/'],
+        # [
+        #     f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_0/data/seed",
+        # ] + [
+        #     f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_{idx}/data/retrieved" \
+        #     for idx in range(5)
+        # ],
         "n_demos": None,
         "batch_size": 128,
-        "seq_len": 1,
+        "seq_len": 2,
         "shuffle": True,
         "load_imgs": False,
-        "goal_condition": goal_condition
+        "goal_condition": goal_condition,
+        "seed_sample_ratio": 0.3,
+        "terminal_sample_ratio": None,#0.01,
     }
 
     # policy_configs = {
@@ -173,13 +171,13 @@ if __name__ == "__main__":
 
     obs_dim = 2048 + 512
     action_dim = 2
-    qf_kwargs = dict(hidden_sizes=[512, 512], layer_norm=True)
+    qf_kwargs = dict(hidden_sizes=[1024, 1024, 1024], layer_norm=True)
 
     policy_configs = {
         "policy": GaussianPolicy(
                         obs_dim=obs_dim,
                         action_dim=action_dim,
-                        hidden_sizes=[512, 512, 512],
+                        hidden_sizes=[1024, 1024, 1024,],
                         max_log_std=0,
                         min_log_std=-6,
                         std_architecture="values",
@@ -187,6 +185,21 @@ if __name__ == "__main__":
                         # output_activation=nn.Identity(),
                         layer_norm=True,
                     ).to(device),
+        "policy": TanhGaussianBCPolicy(
+                        env_spec= AttrDict({
+                            observation_space = AttrDict({
+                                "flat_dim": 2048 + 512
+                            }),
+                            action_space = AttrDict({
+                                "flat_dim": 2
+                            })
+                        }),
+                        hidden_sizes = [1024, 1024, 1024],
+                        hidden_nonlinearity= nn.LeakyReLU(),
+                        output_nonlinearity= None,
+                        min_std =  np.exp(-6.),
+                        max_std = np.exp(0.)
+                    )
         "qf1": ConcatMlp(
                         input_size=obs_dim + action_dim,
                         output_size=1,
@@ -234,22 +247,26 @@ if __name__ == "__main__":
         "dest_dir": dest_dir,
         "eval_period": 1e3,
         "eval_episodes": 10,
-        "max_traj_len": 120,
-        "n_steps": 5e5,
+        "max_traj_len": 60,
+        # "n_steps": 5e5,
+        "n_epochs": 10000,
+        "n_epoch_cycles": 5000,
+        "n_save_best": 3,
+        "max_global_steps": 5e5,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
         "n_episodes": 50,
-        "max_traj_len": 120,
+        "max_traj_len": 60,
         "goal_cond": goal_condition,
     }
 
     rollout_configs = {
         "task_name": task_name,
         "n_episodes": 10,
-        "max_traj_len": 120,
+        "max_traj_len": 60,
         "goal_cond": goal_condition,
     }
 
@@ -266,7 +283,7 @@ if __name__ == "__main__":
         resume=exp_name,
         project="boost",
         config=configs,
-        dir="/home/jullian-yapeter/tmp",
+        dir="/home/sdass/tmp",
         entity="clvr",
         notes="",
     )
@@ -279,7 +296,7 @@ if __name__ == "__main__":
     # policy = BCPolicy(**policy_configs)
     # policy = TanhGaussianBCPolicy(**policy_configs)
     iql_policy = IQLModel(**policy_configs)
-    policy = train(policy=policy,
+    policy = train(iql_policy=iql_policy,
                    dataloader=dataloader,
                    benchmark=benchmark,
                    **train_configs)

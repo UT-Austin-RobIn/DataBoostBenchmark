@@ -7,61 +7,98 @@ import numpy as np
 
 import databoost
 from databoost.utils.data import write_json
-
+from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
+from torch import nn as nn
+from databoost.models.iql.iql import IQLModel
 
 random.seed(42)
 
-
-# train/load a policy
-# parser = argparse.ArgumentParser(
-#     description='temp')
-# parser.add_argument("--n_chkpt", help="num seed groups")
-# parser.add_argument("--n_window", help="num success prior groups")
-# args = parser.parse_args()
-
-policy_filename = "/home/sdass/boosting/models/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt"
+policy_filename = "/data/sdass/DataBoostBenchmark/language_table/models/dummy/separate/IQL/language_table-separate-IQL-iql-testing"
 benchmark = "language_table"
 task = "separate"
-# n_chkpt = int(500000 * 0.25)
-n_chkpt = int(125000)
-n_window = 5
-n_period = 2e3
-n_episodes = 20
+
+obs_dim = 2048 + 512
+action_dim = 2
+qf_kwargs = dict(hidden_sizes=[512, 512], layer_norm=True)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+policy_configs = {
+    "policy": GaussianPolicy(
+                    obs_dim=obs_dim,
+                    action_dim=action_dim,
+                    hidden_sizes=[512, 512, 512],
+                    max_log_std=0,
+                    min_log_std=-6,
+                    std_architecture="values",
+                    hidden_activation=nn.LeakyReLU(),
+                    # output_activation=nn.Identity(),
+                    layer_norm=True,
+                ).to(device),
+    "qf1": ConcatMlp(
+                    input_size=obs_dim + action_dim,
+                    output_size=1,
+                    **qf_kwargs,
+                ).to(device),
+    "qf2": ConcatMlp(
+                    input_size=obs_dim + action_dim,
+                    output_size=1,
+                    **qf_kwargs,
+                ).to(device),
+    "target_qf1": ConcatMlp(
+                    input_size=obs_dim + action_dim,
+                    output_size=1,
+                    **qf_kwargs,
+                ).to(device),
+    "target_qf2": ConcatMlp(
+                    input_size=obs_dim + action_dim,
+                    output_size=1,
+                    **qf_kwargs,
+                ).to(device),
+    "vf": ConcatMlp(
+                    input_size=obs_dim,
+                    output_size=1,
+                    **qf_kwargs,
+                ).to(device),
+
+    "discount": 0.995,
+    "quantile": 0.7,
+    "clip_score": 100,
+    "soft_target_tau": 0.005,
+    "reward_scale": 10,
+    "beta": 10.0,
+    "policy_lr": 1e-3,
+    "qf_lr": 1e-3,
+    # "policy_weight_decay": 0.01,
+    # "q_weight_decay": 0.01,
+    # "optimizer_class": torch.optim.AdamW,
+    "device": device
+}
 
 benchmark = databoost.get_benchmark(benchmark)
-# policy_filenames = os.listdir(policy_dir)
 success_rates = []
-for idx in range(n_window):
-    # chkpt = int(n_chkpt - idx * n_period)
-    # policy_filename = None
-    # for fn in policy_filenames:
-    #     if f"-{chkpt}.pt" in fn:
-    #         policy_filename = os.path.join(policy_dir, fn)
-    #         break
-    # if policy_filename is None:
-    #     print(f"chkpt {chkpt} not found")
-    #     raise ValueError
-    # print(f"evaluating {policy_filename} on {task} task")
-    policy = torch.load(policy_filename)
-    # initialize appropriate benchmark with corresponding task
-    # evaluate the policy using the benchmark
+
+# policy = torch.load(policy_filename)
+policy = IQLModel(**policy_configs)
+for i in range(3):
+    checkpoint = torch.load(policy_filename + f'-best{i}.pt')
+    policy.load_from_checkpoint(checkpoint, load_optimizer=True)
     success_rate, gif = benchmark.evaluate(
         task_name=task,
         policy=policy,
-        n_episodes=n_episodes,
-        max_traj_len=120,
+        n_episodes=30,
+        max_traj_len=80,
         render=False,
         goal_cond=False
     )
     print(f"policy success rate: {success_rate}")
     success_rates.append(success_rate)
-print(f"avg success: {np.mean(success_rates)}")
-metrics = {
-    "window": n_window,
-    "period": n_period,
-    "n_episodes": n_episodes,
-    "max": np.max(success_rates),
-    "min": np.min(success_rates),
-    "mean": np.mean(success_rates)
-}
-write_json(metrics, os.path.join(policy_dir, f"metrics-chkpt_{int(n_chkpt)}-window_{int(n_window)}-per_{int(n_period)}.json"))
+    print(f"avg success: {np.mean(success_rates)}")
+    # metrics = {
+    #     "window": n_window,
+    #     "period": n_period,
+    #     "n_episodes": n_episodes,
+    #     "max": np.max(success_rates),
+    #     "min": np.min(success_rates),
+    #     "mean": np.mean(success_rates)
+    # }
+    # write_json(metrics, os.path.join(policy_dir, f"metrics-chkpt_-window_{int(n_window)}-per_{int(n_period)}.json"))

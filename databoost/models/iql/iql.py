@@ -139,7 +139,6 @@ class IQLModel(nn.Module):
         actions = batch['actions'][:, 0].float().to(self.device)
         next_obs = batch['observations'][:, 1].float().to(self.device)
         seed_bool = batch['seed'][:, 0].int().detach().numpy()
-
         if self.reward_transform:
             rewards = self.reward_transform(rewards)
 
