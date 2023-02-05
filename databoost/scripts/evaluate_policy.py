@@ -19,13 +19,14 @@ random.seed(42)
 # parser.add_argument("--n_window", help="num success prior groups")
 # args = parser.parse_args()
 
-policy_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/OracleNoRL_128"
+policy_dir = "/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC"
 benchmark = "language_table"
 task = "separate"
-n_chkpt = int(308000)
+# n_chkpt = int(500000 * 0.25)
+n_chkpt = int(63000)
 n_window = 5
 n_period = 2e3
-n_episodes = 40
+n_episodes = 20
 
 benchmark = databoost.get_benchmark(benchmark)
 policy_filenames = os.listdir(policy_dir)
@@ -48,7 +49,7 @@ for idx in range(n_window):
         task_name=task,
         policy=policy,
         n_episodes=n_episodes,
-        max_traj_len=100,
+        max_traj_len=120,
         render=False,
         goal_cond=False
     )
@@ -56,6 +57,9 @@ for idx in range(n_window):
     success_rates.append(success_rate)
 print(f"avg success: {np.mean(success_rates)}")
 metrics = {
+    "window": n_window,
+    "period": n_period,
+    "n_episodes": n_episodes,
     "max": np.max(success_rates),
     "min": np.min(success_rates),
     "mean": np.mean(success_rates)
