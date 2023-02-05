@@ -3,6 +3,7 @@ import tqdm
 import torch
 import torchvision
 import os
+import random
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -12,12 +13,13 @@ from databoost.utils.general import AttrDict
 from databoost.utils.data import write_h5
 from language_table.environments import blocks
 from language_table.environments import language_table
-from language_table.environments.rewards import block2block, separate_blocks
+from language_table.environments.rewards import (
+    block2block, block2absolutelocation, block2block_relative_location, block2relativelocation, separate_blocks)
 from r3m import load_r3m
 
 
 class DatasetSaver:
-    def __init__(self):
+    def __init__(self, seed):
         self.traj_keys = [
             "observations",
             "actions",
@@ -32,6 +34,18 @@ class DatasetSaver:
         self.r3m.eval()
         self.r3m.to(self.device)
         self.clip_model, _ = clip.load("ViT-B/32", device=self.device)
+
+        # create list of envs, one for each task
+        self._TASKS = [block2block.BlockToBlockReward,
+                       block2absolutelocation.BlockToAbsoluteLocationReward,
+                       block2block_relative_location.BlockToBlockRelativeLocationReward,
+                       block2relativelocation.BlockToRelativeLocationReward,
+                       separate_blocks.SeparateBlocksReward]
+        self._envs = [language_table.LanguageTable(
+            block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
+            reward_factory=reward_factory,
+            seed=seed,
+        ) for reward_factory in self._TASKS]
 
     def init_traj(self) -> Dict:
         '''Initialize an empty trajectory, preparing for data collection
@@ -105,10 +119,14 @@ class DatasetSaver:
         obs = np.concatenate((img_obs, text_tokens), axis=-1)
         return obs
 
+    def _sample_env(self):
+        assert hasattr(self, "_envs")
+        env_idx = random.randint(0, len(self._TASKS) - 1)
+        return env_idx, self._envs[env_idx]
+
     def generate_dataset(self,
                          policy_checkpt: str,
                          dest_dir: str,
-                         env_seed: int,
                          n_episodes: int = 100000,
                          max_rollout_len=100):
         '''generates a dataset given a list of tasks and other configs.
@@ -120,20 +138,17 @@ class DatasetSaver:
         # load policy
         policy = torch.load(policy_checkpt).eval().to(self.device)
 
-        # make environment
-        env = language_table.LanguageTable(
-            block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
-            reward_factory=separate_blocks.SeparateBlocksReward,
-            seed=env_seed,
-        )
-
         # make data dir
         os.makedirs(dest_dir, exist_ok=True)
 
         # collect rollouts
+        eps_per_task = [0 for _ in range(len(self._TASKS))]
+        success_eps_per_task = [0 for _ in range(len(self._TASKS))]
         for i in tqdm.tqdm(range(n_episodes)):
+            env_idx, env = self._sample_env()
             ob = self._postprocess_obs(env.reset())
             traj = self.init_traj()
+            is_success = False
             for _ in range(max_rollout_len - 1):
                 with torch.no_grad():
                     act = policy.get_action(ob)
@@ -141,20 +156,30 @@ class DatasetSaver:
                 ob_next = self._postprocess_obs(ob_next)
                 self.add_to_traj(traj, ob, act, rew, done, info)
                 if done and rew > 0:
+                    is_success = True
                     break
                 ob = ob_next
 
             # move trajectory data to numpy
             traj = self.traj_to_numpy(traj)
 
+            # update statistics
+            eps_per_task[env_idx] += 1
+            if is_success:
+                success_eps_per_task[env_idx] += 1
+
+            # print statistics
+            if i % 10 == 0:
+                print('Episodes per task: ', eps_per_task)
+                print('Success per task: ', [s/(e+1e-6) for (s, e) in zip(success_eps_per_task, eps_per_task)])
+
             # write episode to h5 file
             write_h5(traj, os.path.join(dest_dir, f"episode_{i}.h5"))
 
 if __name__ == "__main__":
     BATCH = 1
-    DatasetSaver().generate_dataset(
+    DatasetSaver(BATCH).generate_dataset(
         policy_checkpt='/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC_Mixed/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt',
         dest_dir=f'/data/karl/data/table_sim/rollout_data/batch{BATCH}',
-        env_seed=BATCH,
         #n_episodes=1000,
     )
