@@ -401,7 +401,6 @@ class DataBoostDataset(Dataset):
                 if postproc_func is not None:
                     traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                         postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
-
                 traj_len = self.get_traj_len(traj_data)
                 self.path_lens[path] = traj_len
                 self.limited_data_cache[path] = traj_data  # temp, for speed

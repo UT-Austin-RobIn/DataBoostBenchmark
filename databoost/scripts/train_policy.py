@@ -82,7 +82,7 @@ def train(policy: nn.Module,
                 #     n_episodes=eval_episodes,
                 #     goal_cond=goal_condition
                 # )
-                if (step in (5000, 125000, 250000, 375000)) == 0:
+                if step in (5000, 125000, 250000, 375000, 500000):
                     print(f"evaluating step {step} with {eval_episodes} episodes")
                     success_rate, _ = benchmark.evaluate(
                         policy=policy,
@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "BC-Mixed"
+    boosting_method = "BC"
     goal_condition = False
     mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
@@ -124,12 +124,20 @@ if __name__ == "__main__":
     dataloader_configs = {
         #"dataset_dir": "/data/karl/data/table_sim/prior_data_clip",
         # "dataset_dir": "/home/karl/data/language_table/prior_data_clip",
+        # "dataset_dir": [
+        #     "/home/karl/data/language_table/prior_data_clip",
+        #     "/data/karl/data/language_table/rl_episodes"
+        # ],
+        # "/home/karl/data/language_table/seed_task_separate",
+        # "/home/karl/data/language_table/prior_data_clip",
+        # "/data/karl/data/language_table/rl_episodes"
+        # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
+        # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
         "dataset_dir": [
-            # "/home/karl/data/language_table/seed_task_separate",
-            "/home/karl/data/language_table/prior_data_clip",
-            "/data/karl/data/language_table/rl_episodes"
-            # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
-            # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
+            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_0/data/seed",
+        ] + [
+            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_{idx}/data/retrieved" \
+            for idx in range(5)
         ],
         "n_demos": None,
         "batch_size": 128,
@@ -169,7 +177,7 @@ if __name__ == "__main__":
         "task_name": task_name,
         "dest_dir": dest_dir,
         "eval_period": 1e3,
-        "eval_episodes": 40,
+        "eval_episodes": 50,
         "max_traj_len": 120,
         "n_steps": 5e5,
         "goal_condition": goal_condition
@@ -240,7 +248,7 @@ if __name__ == "__main__":
 
     '''generate sample policy rollouts'''
     success_rate, gifs = benchmark.evaluate(
-        policy=final_policy,
+        policy=policy,
         render=True,
         **rollout_configs
     )
