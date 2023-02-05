@@ -1,31 +1,30 @@
-import databoost
-from databoost.envs.metaworld.utils import load_env_state
+# import databoost
+# from databoost.envs.metaworld.utils import load_env_state
 from databoost.utils.data import find_h5, read_h5
-import cv2
+# import cv2
 import pickle
 import numpy as np
+from tqdm import tqdm
 
-lens = []
 total_len = 0
-min_len = 999
-max_len = 0
-min_file = ""
-max_file = ""
-file_paths = find_h5("/data/jullian-yapeter/DataBoostBenchmark/metaworld/data/prior")
-for file_path in file_paths:
-    curr_len = len(read_h5(file_path).observations)
-    if curr_len > max_len:
-        max_len = curr_len
-        max_file = file_path
-    if curr_len < min_len:
-        min_len = curr_len
-        min_file = file_path
+file_paths = find_h5("/data/karl/data/language_table/rl_episodes")
+# file_paths += find_h5("/data/karl/data/language_table/rl_episodes")
+for file_path in tqdm(file_paths):
+    curr_len = len(read_h5(file_path).actions)
+    # if curr_len > max_len:
+    #     max_len = curr_len
+    #     max_file = file_path
+    # if curr_len < min_len:
+    #     min_len = curr_len
+    #     min_file = file_path
     total_len += curr_len
-    lens.append(curr_len)
+    # lens.append(curr_len)
+print(f"total_len: {total_len}")
+print(f"total_files: {len(file_paths)}")
 print(f"avg_len: {total_len//len(file_paths)}")
-print(f"max_len: {max_len}, {max_file}")
-print(f"min_len: {min_len}, {min_file}")
-print(f"std: {np.std(lens)}")
+# print(f"max_len: {max_len}, {max_file}")
+# print(f"min_len: {min_len}, {min_file}")
+# print(f"std: {np.std(lens)}")
 # max file = /data/jullian-yapeter/DataBoostBenchmark/metaworld/data/prior/plate-slide-side/plate-slide-side_2.h5
 # benchmark = databoost.get_benchmark("metaworld")
 # env = benchmark.get_env("pick-place-wall")
