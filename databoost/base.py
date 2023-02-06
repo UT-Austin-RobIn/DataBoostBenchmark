@@ -7,6 +7,7 @@ from typing import Callable, Dict, List, Tuple
 import cv2
 import gym
 import numpy as np
+import random
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -15,7 +16,7 @@ from tqdm import tqdm
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
     find_pkl,
-    find_h5, read_h5, write_h5,
+    find_h5, read_h5, write_h5, read_json,
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
@@ -89,7 +90,8 @@ class DataBoostEnvWrapper(gym.Wrapper):
                         load_imgs: bool = True,
                         goal_condition: bool = False,
                         seed_sample_ratio: float = None,
-                        terminal_sample_ratio: float = None,) -> DataLoader:
+                        terminal_sample_ratio: float = None,
+                        limited_cache_size: float = 10000) -> DataLoader:
         '''gets a dataloader to load in h5 data from the given dataset_dir.
 
         Args:
@@ -102,7 +104,7 @@ class DataBoostEnvWrapper(gym.Wrapper):
         Returns:
             dataloader [DataLoader]: DataLoader for given dataset directory
         '''
-        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, load_imgs=load_imgs, postproc_func=self.postproc_func, goal_condition=goal_condition, seed_sample_ratio=seed_sample_ratio, terminal_sample_ratio=terminal_sample_ratio)
+        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, load_imgs=load_imgs, postproc_func=self.postproc_func, goal_condition=goal_condition, seed_sample_ratio=seed_sample_ratio, terminal_sample_ratio=terminal_sample_ratio, limited_cache_size=limited_cache_size)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_seed_dataset(self, n_demos: int = None) -> Dataset:
@@ -311,10 +313,12 @@ class DataBoostBenchmarkBase:
                 with torch.no_grad():
                     if goal_cond: ob = np.concatenate((ob, goal_ob), axis = -1)
                     act = policy.get_action(ob)
+
                 ob, rew, done, info = env.step(act)
                 if render: gif.append(env.default_render().transpose(2, 0, 1)[::-1])
                 if self.evaluate_success(env, ob, rew, done, info):
                     n_successes += 1
+                    print(n_successes)
                     break
             if render and len(gif) > 0:
                 if len(gif) < max_traj_len:
@@ -337,7 +341,8 @@ class DataBoostDataset(Dataset):
                  postproc_func: Callable = None,
                  goal_condition: bool = False,
                  seed_sample_ratio: float = None,
-                 terminal_sample_ratio: float = None):
+                 terminal_sample_ratio: float = None,
+                 limited_cache_size: int = 10000):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
         Will return AttrDict object where each attribute is of shape:
@@ -364,7 +369,7 @@ class DataBoostDataset(Dataset):
             paths [List[str]]: list of h5 file paths to load in
             slices [List[Tuple[int]]]: list of tuples (path, start_idx, end_idx)
         '''
-        self.limited_data_cache = {}
+        self.limited_cache_size = limited_cache_size
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         self.goal_condition = goal_condition
@@ -389,11 +394,19 @@ class DataBoostDataset(Dataset):
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
 
+        # file_paths += read_json('/home/sdass/boosting/data/langtable/selected_seeds.json')
+
         self.seed_data = []
         self.seed_lens = 0
-        self.prior_data = []
+        
+        self.prior_data = {}
+        self.prior_paths = []
         self.prior_lens = 0
         for files in tqdm(file_paths):
+            if ('seed' not in files or 'Seed' not in files) and len(self.prior_data.keys()) >= self.limited_cache_size:
+                self.prior_paths.append(files)
+                continue
+
             traj = read_h5(files)
             traj_len = self.get_traj_len(traj)
             
@@ -404,24 +417,28 @@ class DataBoostDataset(Dataset):
                 traj[k] = np.concatenate((np.array(traj[k]).reshape(traj_len, -1), np.zeros_like(traj[k][0]).reshape(1, -1)), axis=0)
 
             traj['dones'] = np.zeros(traj_len+1)
-            traj['dones'][-2] = 1
+            traj['dones'][-2] = 1.
             traj['rewards'] = np.zeros(traj_len+1)
-            if 'Seed' in files:   
-                traj['rewards'][-2] = 1
+            if 'Seed' in files or 'seed' in files:   
+                traj['rewards'][-2] = 1.
                 traj['seed'] = np.ones(traj_len+1)
                 
                 self.seed_lens += traj_len
                 self.seed_data.append(traj)
             else:
+                self.prior_paths.append(files)
                 traj['seed'] = np.zeros(traj_len+1)
+                self.prior_data[files] = traj
                 self.prior_lens += traj_len
-                self.prior_data.append(traj)
+        
+        if len(self.prior_data.keys()) >= self.limited_cache_size:
+            self.prior_lens = int(self.prior_lens*len(self.prior_paths)/self.limited_cache_size)
 
         print("Seed len", self.seed_lens)
         print("Prior len", self.prior_lens)
 
         self.seed_sample_ratio = self.seed_lens/len(self) if seed_sample_ratio is None else seed_sample_ratio   
-        self.terminal_sample_ratio = terminal_sample_ratio
+        self.terminal_sample_ratio = terminal_sample_ratio*self.seed_sample_ratio if terminal_sample_ratio is not None else None
         
     def __len__(self) -> int:
         '''returns length of the dataset; number of traj slices associated with
@@ -432,7 +449,21 @@ class DataBoostDataset(Dataset):
         '''
         return self.seed_lens + self.prior_lens
 
-    def process_traj_for_iql(self, )
+    def process_prior_file_for_iql(self, files):
+        traj = read_h5(files)
+        traj_len = self.get_traj_len(traj)
+
+        for k in  ['file_paths', 'start_end_idxs', 'infos', 'info', 'imgs']:
+                if k in traj:
+                    del traj[k]
+        for k in traj:
+            traj[k] = np.concatenate((np.array(traj[k]).reshape(traj_len, -1), np.zeros_like(traj[k][0]).reshape(1, -1)), axis=0)        
+        traj['dones'] = np.zeros(traj_len+1)
+        traj['dones'][-2] = 1
+        traj['rewards'] = np.zeros(traj_len+1)
+        traj['seed'] = np.zeros(traj_len+1)
+
+        return traj
 
     def __getitem__(self, idx: int) -> Dict:
         '''get item from the dataset; a dictionary of trajectory data.
@@ -453,13 +484,30 @@ class DataBoostDataset(Dataset):
                 sample_idx = traj_len - 2
             else:
                 sample_idx = np.random.randint(traj_len-1)
-            return get_traj_slice(self.seed_data[seq_idx], traj_len, sample_idx, sample_idx + 2)
-            
+            # return get_traj_slice(self.seed_data[seq_idx], traj_len, sample_idx, sample_idx + 2)
+            return {
+                "observations": self.seed_data[seq_idx]["observations"][sample_idx: sample_idx+2].copy(),
+                "actions": (self.seed_data[seq_idx]["actions"][sample_idx: sample_idx+2]/0.03).copy(),
+                "rewards": self.seed_data[seq_idx]["rewards"][sample_idx: sample_idx+2].copy(),
+                "dones": self.seed_data[seq_idx]["dones"][sample_idx: sample_idx+2].copy(),
+                "seed": self.seed_data[seq_idx]["seed"][sample_idx: sample_idx+2].copy(),
+            }
         else:
-            seq_idx = np.random.randint(len(self.prior_data))
-            traj_len = self.get_traj_len(self.prior_data[seq_idx])
+            filename = self.prior_paths[np.random.randint(len(self.prior_paths))]
+            # if filename not in self.prior_data:
+            #     self.prior_data.pop(list(self.prior_data.keys())[0])
+            #     self.prior_data[filename] = self.process_prior_file_for_iql(filename)
+
+            traj_len = self.get_traj_len(self.prior_data[filename])
             sample_idx = np.random.randint(traj_len-1)
-            return get_traj_slice(self.prior_data[seq_idx], traj_len, sample_idx, sample_idx + 2)
+            # return get_traj_slice(self.prior_data[filename], traj_len, sample_idx, sample_idx + 2)
+            return {
+                "observations": self.prior_data[filename]["observations"][sample_idx: sample_idx+2].copy(),
+                "actions": (self.prior_data[filename]["actions"][sample_idx: sample_idx+2]/0.03).copy(),
+                "rewards": self.prior_data[filename]["rewards"][sample_idx: sample_idx+2].copy(),
+                "dones": self.prior_data[filename]["dones"][sample_idx: sample_idx+2].copy(),
+                "seed": self.prior_data[filename]["seed"][sample_idx: sample_idx+2].copy(),
+            }
 
         # path_id, start_idx, end_idx = self.slices[idx]
         # if self.paths[path_id] in self.limited_data_cache:

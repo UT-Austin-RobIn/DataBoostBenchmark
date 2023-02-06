@@ -202,7 +202,8 @@ def get_traj_slice(traj_data: Dict,
                 assert len(traj_seq[attr]) == seq_len
             else:
                 # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-                traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
+                raise "Somehting is wrong"
+                # traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
         return traj_seq
 
 

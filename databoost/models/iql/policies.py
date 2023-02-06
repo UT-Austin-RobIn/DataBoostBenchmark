@@ -229,6 +229,7 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
             # output_activation=torch.tanh,
             **kwargs
         )
+        self.max_action_range = 0.03
         self.min_log_std = min_log_std
         self.max_log_std = max_log_std
         self.log_std = None
@@ -251,13 +252,20 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
             self.log_std = np.log(std)
             assert LOG_SIG_MIN <= self.log_std <= LOG_SIG_MAX
     
+    def _tanh_squash_output(self, action, log_prob):
+        """Passes continuous output through a tanh function to constrain action range, adjusts log_prob."""
+        action_new = self.max_action_range * torch.tanh(action)
+        log_prob_update = np.log(self.max_action_range) + 2 * (np.log(2.) - action -
+              torch.nn.functional.softplus(-2. * action)).sum(dim=-1)  # maybe more stable version from Youngwoon Lee
+        return action_new, log_prob - log_prob_update
+
     def forward(self, obs):
         h = obs
         for i, fc in enumerate(self.fcs):
             h = self.hidden_activation(fc(h))
         preactivation = self.last_fc(h)
-        mean = torch.mul(self.output_activation(preactivation), 0.03)
-        # mean = self.output_activation(preactivation)
+        # mean = torch.mul(self.output_activation(preactivation), 0.03)
+        mean = self.output_activation(preactivation)
         if self.std is None:
             if self.std_architecture == "shared":
                 log_std = torch.sigmoid(self.last_fc_log_std(h))

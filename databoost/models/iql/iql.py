@@ -148,6 +148,7 @@ class IQLModel(nn.Module):
         Policy and Alpha Loss
         """
         dist = self.policy(obs)
+        # dist, _  = self.policy(obs)
 
         """
         QF Loss
@@ -181,6 +182,7 @@ class IQLModel(nn.Module):
 
         adv = q_pred - vf_pred
         exp_adv = torch.exp(adv * self.beta)
+        # exp_adv = torch.ones_like(q_pred)
         if self.clip_score is not None:
             exp_adv = torch.clamp(exp_adv, max=self.clip_score)
 
@@ -226,32 +228,32 @@ class IQLModel(nn.Module):
         prior_idx = np.where(seed_bool == 0)[0]
         
         logs = {
-            'losses/qf1_loss': qf1_loss.item(),
-            'losses/qf2_loss': qf2_loss.item(),
-            'losses/vf_loss': vf_loss.item(),
-            'losses/policy_loss': policy_loss.item(),
-            'values/vf': target_vf_pred.mean().item(),
-            'values/q_target': q_target.mean().item(),
-            'values/q1_pred': q1_pred.mean().item(),
-            'values/q2_pred': q2_pred.mean().item(),
-            'values/adv_weight': exp_adv.mean().item(),
+            'losses/qf1_loss': qf1_loss.detach().item(),
+            'losses/qf2_loss': qf2_loss.detach().item(),
+            'losses/vf_loss': vf_loss.detach().item(),
+            'losses/policy_loss': policy_loss.detach().item(),
+            'values/vf': target_vf_pred.mean().detach().item(),
+            'values/q_target': q_target.mean().detach().item(),
+            'values/q1_pred': q1_pred.mean().detach().item(),
+            'values/q2_pred': q2_pred.mean().detach().item(),
+            'values/adv_weight': exp_adv.mean().detach().item(),
             
             # seed specific logs
-            'values_seed/vf': target_vf_pred[seed_idx].sum().item(),
-            'values_seed/q_target': q_target[seed_idx].sum().item(),
-            'values_seed/q1_pred': q1_pred[seed_idx].sum().item(),
-            'values_seed/q2_pred': q2_pred[seed_idx].sum().item(),
-            'values_seed/dones': terminals[seed_idx].sum().item(),
-            'values_seed/rewards': rewards[seed_idx].sum().item(),
+            'values_seed/vf': target_vf_pred[seed_idx].sum().detach().item(),
+            'values_seed/q_target': q_target[seed_idx].sum().detach().item(),
+            'values_seed/q1_pred': q1_pred[seed_idx].sum().detach().item(),
+            'values_seed/q2_pred': q2_pred[seed_idx].sum().detach().item(),
+            'values_seed/dones': terminals[seed_idx].sum().detach().item(),
+            'values_seed/rewards': rewards[seed_idx].sum().detach().item(),
             'values_seed/num_samples': len(seed_idx),
 
             # prior specific logs
-            'values_prior/vf': target_vf_pred[prior_idx].sum().item(),
-            'values_prior/q_target': q_target[prior_idx].sum().item(),
-            'values_prior/q1_pred': q1_pred[prior_idx].sum().item(),
-            'values_prior/q2_pred': q2_pred[prior_idx].sum().item(),
-            'values_prior/dones': terminals[prior_idx].sum().item(),
-            'values_prior/rewards': rewards[prior_idx].sum().item(),
+            'values_prior/vf': target_vf_pred[prior_idx].sum().detach().item(),
+            'values_prior/q_target': q_target[prior_idx].sum().detach().item(),
+            'values_prior/q1_pred': q1_pred[prior_idx].sum().detach().item(),
+            'values_prior/q2_pred': q2_pred[prior_idx].sum().detach().item(),
+            'values_prior/dones': terminals[prior_idx].sum().detach().item(),
+            'values_prior/rewards': rewards[prior_idx].sum().detach().item(),
             'values_prior/num_samples': len(prior_idx)
         }
 
@@ -303,4 +305,6 @@ class IQLModel(nn.Module):
     
     def get_action(self, obs):
         act = self.policy(torch.tensor(obs).float().to('cuda')).mu.cpu().detach().numpy()
-        return act
+        # act = self.policy.get_action(obs)
+        return act*0.03
+        

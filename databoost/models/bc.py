@@ -118,6 +118,7 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
         Returns:
             loss [torch.float]: mean negative log likelihood of batch
         '''
+        # action_batch /= 0.1
         log_prob = pred_act_dist.log_prob(action_batch)
         loss = -1 * log_prob.mean()
         return loss
@@ -133,6 +134,7 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
             ob = torch.tensor(ob[None], dtype=torch.float).to(torch.device("cuda"))
             dist = self._module(ob)
             act = dist.mean.cpu().detach().numpy()[0]
+            # act *= 0.1
             return act
 
     def embed(self, obs):
