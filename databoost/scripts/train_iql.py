@@ -128,8 +128,6 @@ if __name__ == "__main__":
             # "/home/karl/data/language_table/prior_data_clip",
             # "/data/karl/data/table_sim/rollout_data",
 
-            "/home/sdass/boosting/data/BC_0pt1_9"
-
             # '/home/sdass/boosting/data/langtable/seed/',
             # '/home/sdass/boosting/data/langtable/retrieved/',
         ],

@@ -306,5 +306,5 @@ class IQLModel(nn.Module):
     def get_action(self, obs):
         act = self.policy(torch.tensor(obs).float().to('cuda')).mu.cpu().detach().numpy()
         # act = self.policy.get_action(obs)
-        return act*0.03
+        return act#*0.03
         

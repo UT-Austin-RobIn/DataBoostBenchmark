@@ -15,14 +15,14 @@ from databoost.utils.general import AttrDict
 
 # random.seed(42)
 
-exp_name = "iql-original_policy2"
+exp_name = "iql-og-again"
 boosting_method = "demo"
 policy_filename = f"/data/sdass/DataBoostBenchmark/language_table/models/dummy/separate/{boosting_method}/{exp_name}/language_table-separate-{boosting_method}-{exp_name}"
 
 benchmark = "language_table"
 task = "separate"
 
-n_chkpt = int(150e3)
+n_chkpt = int(52e3)
 n_window = 5
 n_period = 2e3
 n_episodes = 20
@@ -36,7 +36,7 @@ policy_configs = {
     "policy": GaussianPolicy(
                     obs_dim=obs_dim,
                     action_dim=action_dim,
-                    hidden_sizes=[1024]*3,
+                    hidden_sizes=[512]*4,
                     max_log_std=0,
                     min_log_std=-6,
                     std_architecture="values",

@@ -487,7 +487,7 @@ class DataBoostDataset(Dataset):
             # return get_traj_slice(self.seed_data[seq_idx], traj_len, sample_idx, sample_idx + 2)
             return {
                 "observations": self.seed_data[seq_idx]["observations"][sample_idx: sample_idx+2].copy(),
-                "actions": (self.seed_data[seq_idx]["actions"][sample_idx: sample_idx+2]/0.03).copy(),
+                "actions": (self.seed_data[seq_idx]["actions"][sample_idx: sample_idx+2]).copy(),#/0.03).copy(),
                 "rewards": self.seed_data[seq_idx]["rewards"][sample_idx: sample_idx+2].copy(),
                 "dones": self.seed_data[seq_idx]["dones"][sample_idx: sample_idx+2].copy(),
                 "seed": self.seed_data[seq_idx]["seed"][sample_idx: sample_idx+2].copy(),
@@ -503,7 +503,7 @@ class DataBoostDataset(Dataset):
             # return get_traj_slice(self.prior_data[filename], traj_len, sample_idx, sample_idx + 2)
             return {
                 "observations": self.prior_data[filename]["observations"][sample_idx: sample_idx+2].copy(),
-                "actions": (self.prior_data[filename]["actions"][sample_idx: sample_idx+2]/0.03).copy(),
+                "actions": (self.prior_data[filename]["actions"][sample_idx: sample_idx+2]).copy(),#/0.03).copy(),
                 "rewards": self.prior_data[filename]["rewards"][sample_idx: sample_idx+2].copy(),
                 "dones": self.prior_data[filename]["dones"][sample_idx: sample_idx+2].copy(),
                 "seed": self.prior_data[filename]["seed"][sample_idx: sample_idx+2].copy(),
