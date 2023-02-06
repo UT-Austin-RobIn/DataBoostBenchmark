@@ -393,11 +393,11 @@ class DataBoostDataset(Dataset):
         self.seed_lens = 0
         self.prior_data = []
         self.prior_lens = 0
-        for files in file_paths:
+        for files in tqdm(file_paths):
             traj = read_h5(files)
             traj_len = self.get_traj_len(traj)
             
-            for k in  ['file_paths', 'start_end_idxs', 'infos', 'info']:
+            for k in  ['file_paths', 'start_end_idxs', 'infos', 'info', 'imgs']:
                 if k in traj:
                     del traj[k]
             for k in traj:
@@ -406,7 +406,7 @@ class DataBoostDataset(Dataset):
             traj['dones'] = np.zeros(traj_len+1)
             traj['dones'][-2] = 1
             traj['rewards'] = np.zeros(traj_len+1)
-            if 'seed' in files:   
+            if 'Seed' in files:   
                 traj['rewards'][-2] = 1
                 traj['seed'] = np.ones(traj_len+1)
                 
@@ -431,6 +431,8 @@ class DataBoostDataset(Dataset):
             len(self.slices) [int]: number of traj slices that the dataset can sample
         '''
         return self.seed_lens + self.prior_lens
+
+    def process_traj_for_iql(self, )
 
     def __getitem__(self, idx: int) -> Dict:
         '''get item from the dataset; a dictionary of trajectory data.

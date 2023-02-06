@@ -256,8 +256,8 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
         for i, fc in enumerate(self.fcs):
             h = self.hidden_activation(fc(h))
         preactivation = self.last_fc(h)
-        # mean = torch.mul(self.output_activation(preactivation), 0.03)
-        mean = self.output_activation(preactivation)
+        mean = torch.mul(self.output_activation(preactivation), 0.03)
+        # mean = self.output_activation(preactivation)
         if self.std is None:
             if self.std_architecture == "shared":
                 log_std = torch.sigmoid(self.last_fc_log_std(h))

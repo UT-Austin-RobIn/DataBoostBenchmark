@@ -44,10 +44,10 @@ def train(iql_policy,
     min_success_best = 0
 
     global_step = iql_policy._n_train_steps_total
-    for epoch in tqdm(range(int(n_epochs))):
+    for epoch in range(int(n_epochs)):
         for cycle in range(n_epoch_cycles):
             logs, agg = {}, {}
-            for batch_num, batch in enumerate(dataloader):
+            for batch_num, batch in tqdm(enumerate(dataloader)):
                 log = iql_policy.train_from_torch(batch)
                 
                 for k in log:
@@ -117,24 +117,16 @@ if __name__ == "__main__":
     }
 
     dataloader_configs = {
-        #"dataset_dir": "/data/karl/data/table_sim/prior_data_clip",
-        # "dataset_dir": "/home/karl/data/language_table/prior_data_clip",
-        # "dataset_dir": [
-        #     "/home/karl/data/language_table/prior_data_clip",
-        #     "/data/karl/data/language_table/rl_episodes"
-        # ],
-        # "/home/karl/data/language_table/seed_task_separate",
-        # "/home/karl/data/language_table/prior_data_clip",
-        # "/data/karl/data/language_table/rl_episodes"
-        # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
-        # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
-        "dataset_dir": ['/home/sdass/boosting/data/langtable/seed/', '/home/sdass/boosting/data/langtable/retrieved/'],
-        # [
-        #     f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_0/data/seed",
-        # ] + [
-        #     f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_{idx}/data/retrieved" \
-        #     for idx in range(5)
-        # ],
+        "dataset_dir": [
+            "/home/jullian-yapeter/data/boosted_data/language_table/Seed",
+            "/home/karl/data/language_table/prior_data_clip",
+            # "/data/karl/data/table_sim/rollout_data",
+
+            # '/home/sdass/boosting/data/langtable/seed/',
+            # '/home/sdass/boosting/data/langtable/retrieved/',
+        ],
+        
+        
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 2,
@@ -185,21 +177,21 @@ if __name__ == "__main__":
                         # output_activation=nn.Identity(),
                         layer_norm=True,
                     ).to(device),
-        "policy": TanhGaussianBCPolicy(
-                        env_spec= AttrDict({
-                            observation_space = AttrDict({
-                                "flat_dim": 2048 + 512
-                            }),
-                            action_space = AttrDict({
-                                "flat_dim": 2
-                            })
-                        }),
-                        hidden_sizes = [1024, 1024, 1024],
-                        hidden_nonlinearity= nn.LeakyReLU(),
-                        output_nonlinearity= None,
-                        min_std =  np.exp(-6.),
-                        max_std = np.exp(0.)
-                    )
+        # "policy": TanhGaussianBCPolicy(
+        #                 env_spec= AttrDict({
+        #                     observation_space = AttrDict({
+        #                         "flat_dim": 2048 + 512
+        #                     }),
+        #                     action_space = AttrDict({
+        #                         "flat_dim": 2
+        #                     })
+        #                 }),
+        #                 hidden_sizes = [1024, 1024, 1024],
+        #                 hidden_nonlinearity= nn.LeakyReLU(),
+        #                 output_nonlinearity= None,
+        #                 min_std =  np.exp(-6.),
+        #                 max_std = np.exp(0.)
+        #             )
         "qf1": ConcatMlp(
                         input_size=obs_dim + action_dim,
                         output_size=1,
