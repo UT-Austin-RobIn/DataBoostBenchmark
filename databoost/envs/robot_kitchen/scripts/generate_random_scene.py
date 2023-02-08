@@ -1,65 +1,45 @@
 import random
 import json
 
+from databoost.utils.data import read_json, write_json
+
 
 OBJECTS = [
-    ## '''stationary'''
+    # '''stationary'''
     # "table",
     # "sink",
     # "dish_rack",
     # "oven",
 
-    #'''bowls'''
+    # '''bowls'''
     "gray_bowl",
     "black_bowl",
     "blue_bowl",
 
-    #'''plates'''
+    # '''plates'''
     "white_plate",
     "gray_plate",
 
-    #'''cups'''
+    # '''cups'''
     "green_cup",
     "yellow_cup",
 
-    #'''breads'''
+    # '''breads'''
     "long_bread",
     "square_bread",
 
-    #'''dairy'''
+    # '''dairy'''
     "milk_dairy",
     "butter_dairy",
 
-    #'''meats'''
+    # '''meats'''
     "burger_meat",
     "steak_meat",
 
-    #'''fruits'''
+    # '''fruits'''
     "apple_fruit",
     "orange_fruit"
 ]
-
-def read_json(path: str):
-    '''Read JSON file into dictionary.
-
-    Args:
-        path [str]: path to the JSON file
-    Returns:
-        data [Any]: data of JSON file
-    '''
-    with open(path, "r") as F:
-        return json.load(F)
-
-
-def write_json(obj, dest_path: str):
-    '''Write JSON file to destination path.
-
-    Args:
-        obj [Any]: data to be written to JSON
-        dest_path [str]: destination path of the JSON file
-    '''
-    with open(dest_path, "w") as F:
-        json.dump(obj, F)
 
 
 if __name__ == "__main__":
