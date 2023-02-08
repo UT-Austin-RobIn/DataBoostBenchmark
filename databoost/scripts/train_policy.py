@@ -1,4 +1,4 @@
-# import argparse
+import argparse
 import clip
 import os
 import random
@@ -17,8 +17,16 @@ from databoost.utils.general import AttrDict
 from databoost.utils.data import dump_video_wandb
 
 
-np.random.seed(42)
-random.seed(42)
+# '''temp'''
+# parser = argparse.ArgumentParser(
+#     description='temp')
+# parser.add_argument("--run_num", help="boosting method")
+# args = parser.parse_args()
+# ''''''
+
+
+np.random.seed(88)
+random.seed(88)
 
 
 def train(policy: nn.Module,
@@ -39,7 +47,7 @@ def train(policy: nn.Module,
     optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
     best_success_rate = 0
 
-    model, _ = clip.load("ViT-B/32", device=device)
+    # model, _ = clip.load("ViT-B/32", device=device)
 
     step = 0
     epoch = 0
@@ -75,31 +83,31 @@ def train(policy: nn.Module,
                 if eval_episodes <= 0:
                     wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
                     print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
-                    # continue
+                    continue
                 # eval_loss = benchmark.validate(
                 #     task_name=task_name,
                 #     policy=policy,
                 #     n_episodes=eval_episodes,
                 #     goal_cond=goal_condition
                 # )
-                if step in (5000, 125000, 250000, 375000, 500000):
-                    print(f"evaluating step {step} with {eval_episodes} episodes")
-                    success_rate, _ = benchmark.evaluate(
-                        policy=policy,
-                        render=False,
-                        task_name=task_name,
-                        n_episodes=eval_episodes,
-                        max_traj_len=120,
-                        goal_cond=goal_condition
-                    )
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
-                    if success_rate >= best_success_rate:
-                        torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
-                        best_success_rate = success_rate
-                else:
-                    wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
-                    print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
+                # if step in (5000, 125000, 250000, 375000, 500000):
+                print(f"evaluating step {step} with {eval_episodes} episodes")
+                success_rate, _ = benchmark.evaluate(
+                    policy=policy,
+                    render=False,
+                    task_name=task_name,
+                    n_episodes=eval_episodes,
+                    max_traj_len=120,
+                    goal_cond=goal_condition
+                )
+                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses), "success_rate": success_rate})
+                print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
+                if success_rate >= best_success_rate:
+                    torch.save(copy.deepcopy(policy), os.path.join(dest_dir, f"{exp_name}-best.pt"))
+                    best_success_rate = success_rate
+                # else:
+                #     wandb.log({"step": step, "epoch": epoch, "loss": np.mean(losses)})
+                #     print(f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
                 losses = []
             if step >= n_steps: break
     pbar.close()
@@ -111,11 +119,11 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "BC"
+    boosting_method = "Action_0pt1_9"
     goal_condition = False
     mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
+    dest_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/models/dummy/{boosting_method}/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -133,12 +141,19 @@ if __name__ == "__main__":
         # "/data/karl/data/language_table/rl_episodes"
         # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
         # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
+        
         "dataset_dir": [
-            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_0/data/seed",
+            f"/data/jullian-yapeter/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/part_1/data/seed",
         ] + [
-            f"/home/jullian-yapeter/data/boosted_data/language_table/separate/{boosting_method}/part_{idx}/data/retrieved" \
-            for idx in range(5)
+            f"/data/jullian-yapeter/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/part_{idx + 1}/data/retrieved" \
+            for idx in range(9)
         ],
+
+        # "dataset_dir": [
+        #     "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/seed",
+        #     "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/demonstration",
+        #     # "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/autonomous",
+        # ],
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
@@ -165,6 +180,7 @@ if __name__ == "__main__":
             })
         }),
         "hidden_sizes": [512, 512, 512, 512],
+        "act_range": 0.1,
         "hidden_nonlinearity": nn.ReLU,
         "output_nonlinearity": None,
         "min_std": np.exp(-20.),
@@ -177,23 +193,23 @@ if __name__ == "__main__":
         "task_name": task_name,
         "dest_dir": dest_dir,
         "eval_period": 1e3,
-        "eval_episodes": 50,
-        "max_traj_len": 120,
-        "n_steps": 5e5,
+        "eval_episodes": 0,  # 50,
+        "max_traj_len": 120,  # 120,
+        "n_steps": 5e5,  # 5e5
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 50,
-        "max_traj_len": 120,
+        "n_episodes": 20,  # 50
+        "max_traj_len": 120,  # 120,
         "goal_cond": goal_condition,
     }
 
     rollout_configs = {
         "task_name": task_name,
-        "n_episodes": 10,
-        "max_traj_len": 120,
+        "n_episodes": 10,  # 10,
+        "max_traj_len": 120,  # 120,
         "goal_cond": goal_condition,
     }
 

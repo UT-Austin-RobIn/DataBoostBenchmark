@@ -103,8 +103,9 @@ class BCPolicy(nn.Module):
 
 
 class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
-    def __init__(self, hidden_sizes=None, *args, **kwargs):
+    def __init__(self, hidden_sizes=None, act_range=None, *args, **kwargs):
         self.num_hidden_layers = len(hidden_sizes)
+        self.act_range = act_range
         super().__init__(hidden_sizes=hidden_sizes, *args, **kwargs)
 
     def loss(self,
@@ -118,6 +119,8 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
         Returns:
             loss [torch.float]: mean negative log likelihood of batch
         '''
+        if self.act_range is not None:
+            action_batch /= self.act_range
         log_prob = pred_act_dist.log_prob(action_batch)
         loss = -1 * log_prob.mean()
         return loss
@@ -133,6 +136,8 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
             ob = torch.tensor(ob[None], dtype=torch.float).to(torch.device("cuda"))
             dist = self._module(ob)
             act = dist.mean.cpu().detach().numpy()[0]
+            if self.act_range is not None:
+                act *= self.act_range
             return act
 
     def embed(self, obs):
