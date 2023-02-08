@@ -1,17 +1,18 @@
-import tqdm
-import torch
-import torchvision
 import os
+from typing import Dict
+import tqdm
+
+import clip
 import numpy as np
+from r3m import load_r3m
 import tensorflow as tf
 import tensorflow_datasets as tfds
+import torch
+import torchvision
+from torchvision.transforms import ToPILImage
 
-from typing import Dict
 from databoost.utils.general import AttrDict
 from databoost.utils.data import write_h5
-from r3m import load_r3m
-import clip
-from torchvision.transforms import ToPILImage
 
 
 class DatasetSaver:
@@ -134,8 +135,6 @@ class DatasetSaver:
         for i, episode in tqdm.tqdm(enumerate(it), total=int(n_total)):
             traj = self.init_traj()
             for step in episode['steps']:
-                # ob = tf.concat((step['observation']['effector_translation'],
-                #                 step['observation']['effector_target_translation']), axis=0)
                 act = step['action']
                 rew = step['reward']
                 done = step['is_last'] or step['is_terminal']
@@ -163,7 +162,6 @@ class DatasetSaver:
             encs = np.concatenate((clip_encs, r3m_encs), axis=-1)
 
             # # overwrite obs with R3M encoding, remove images
-            # traj.pop('imgs')
             traj.observations = encs
 
             filename = f"episode_{i}"
@@ -172,8 +170,9 @@ class DatasetSaver:
 
 
 if __name__ == "__main__":
+    dest_dir = "data/language_table"
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
-        dest_dir='/data/jullian-yapeter/lang_table/batch3',
+        dest_dir='data_and_models/language_table/data',
         #n_episodes=1000,
     )
