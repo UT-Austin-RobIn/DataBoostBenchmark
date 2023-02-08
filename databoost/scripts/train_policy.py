@@ -9,7 +9,6 @@ from tqdm import tqdm
 import wandb
 
 from databoost.base import DataBoostBenchmarkBase
-from databoost.utils.general import AttrDict
 from databoost.utils.data import dump_video_wandb
 
 
@@ -120,14 +119,6 @@ if __name__ == "__main__":
         "goal_condition": goal_condition
     }
 
-    # policy_configs = {
-    #     #"obs_dim": 2048 + 77 * (2 if goal_condition else 1),
-    #     "obs_dim": 2048 + 512,
-    #     "action_dim": 2,
-    #     "hidden_dim": 512,
-    #     "n_hidden_layers": 4,
-    #     "dropout_rate": 0.4
-    # }
     policy_configs = {
         "obs_dim": 39 * (2 if goal_condition else 1),
         "act_dim": 4,
@@ -160,8 +151,8 @@ if __name__ == "__main__":
 
     rollout_configs = {
         "task_name": task_name,
-        "n_episodes": 10,  # 10,
-        "max_traj_len": 120,  # 120,
+        "n_episodes": 10,
+        "max_traj_len": 500,
         "goal_cond": goal_condition,
     }
 

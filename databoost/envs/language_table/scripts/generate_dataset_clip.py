@@ -1,6 +1,5 @@
 import tqdm
 import torch
-import torchvision
 import os
 import numpy as np
 import tensorflow as tf
@@ -137,7 +136,6 @@ class DatasetSaver:
                 done = step['is_last'] or step['is_terminal']
                 info = AttrDict(instruction=step['observation']['instruction'])
                 im = np.transpose(step['observation']['rgb'], (2, 0, 1))
-                # import pdb; pdb.set_trace()
                 im = self.clip_preprocess(self.to_pil_transform(im)).numpy()
                 if mask_reward: rew = 0.0
 
@@ -145,19 +143,7 @@ class DatasetSaver:
 
             # move trajectory data to numpy
             traj = self.traj_to_numpy(traj)
-            # import pdb; pdb.set_trace()
             traj.observations = self.clip_model.encode_image(torch.from_numpy(traj.observations).to(self.device)).data.cpu().numpy()
-
-            # # encode images with R3M
-            # imgs = torch.from_numpy(tf.stack(traj.imgs).numpy().transpose(0, 3, 1, 2)).to(self.device)
-            # imgs = torchvision.transforms.Resize((224, 224))(imgs)
-            # encs = self.r3m(imgs).data.cpu().numpy()  # [seq_len, 2048]
-
-            
-            
-            # # overwrite obs with R3M encoding, remove images
-            # traj.pop('imgs')
-            # traj.observations = encs
 
             filename = f"episode_{i}"
             traj["dones"][-1] = True
@@ -165,8 +151,9 @@ class DatasetSaver:
 
 
 if __name__ == "__main__":
+    dest_dir = "data/lang"
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
-        dest_dir='/data/jullian-yapeter/lang_table/batch1',
+        dest_dir='data_and_models/language_table/data',
         #n_episodes=1000,
     )

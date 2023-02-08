@@ -7,7 +7,7 @@ from databoost.utils.general import AttrDict
 
 
 '''General configs'''
-env_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld"
+env_root = "data_and_models/metaworld"
 
 
 '''Tasks configs'''
@@ -23,49 +23,42 @@ tasks = {
         "task_name": "assembly",
         "env": ALL_V2_ENVS["assembly-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
-        "test_dataset": os.path.join(env_root, "test/assembly"),
         "expert_policy": policies.SawyerAssemblyV2Policy,
     }),
     "door-open": AttrDict({
         "task_name": "door-open",
         "env": ALL_V2_ENVS["door-open-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/door-open"),
-        "test_dataset": os.path.join(env_root, "test/door-open"),
         "expert_policy": policies.SawyerDoorOpenV2Policy,
     }),
     "plate-slide-back-side": AttrDict({
         "task_name": "plate-slide-back-side",
         "env": ALL_V2_ENVS["plate-slide-back-side-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back-side"),
-        "test_dataset": os.path.join(env_root, "test/plate-slide-back-side"),
         "expert_policy": policies.SawyerPlateSlideBackSideV2Policy,
     }),
     "plate-slide-side": AttrDict({
         "task_name": "plate-slide-side",
         "env": ALL_V2_ENVS["plate-slide-side-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-side"),
-        "test_dataset": os.path.join(env_root, "test/plate-slide-side"),
         "expert_policy": policies.SawyerPlateSlideSideV2Policy,
     }),
     "coffee-push": AttrDict({
         "task_name": "coffee-push",
         "env": ALL_V2_ENVS["coffee-push-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
-        "test_dataset": os.path.join(env_root, "test/coffee-push"),
         "expert_policy": policies.SawyerCoffeePushV2Policy,
     }),
     "coffee-pull": AttrDict({
         "task_name": "coffee-pull",
         "env": ALL_V2_ENVS["coffee-pull-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
-        "test_dataset": os.path.join(env_root, "test/coffee-pull"),
         "expert_policy": policies.SawyerCoffeePullV2Policy,
     }),
     "stick-pull": AttrDict({
         "task_name": "stick-pull",
         "env": ALL_V2_ENVS["stick-pull-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
-        "test_dataset": os.path.join(env_root, "test/stick-pull"),
         "expert_policy": policies.SawyerStickPullV2Policy,
     }),
     "door-close": AttrDict({
@@ -354,7 +347,7 @@ prior_dataset_kwargs = AttrDict({
 test_tasks_list = [
     "pick-place-wall",
 ]
-test_dataset_dir = os.path.join(env_root, "data/test")
+test_dataset_dir = os.path.join(env_root, "test")
 test_n_demos = 300
 test_do_render = True
 test_save_env_and_goal = True
