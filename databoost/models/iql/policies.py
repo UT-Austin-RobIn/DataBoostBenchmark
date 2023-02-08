@@ -208,7 +208,7 @@ class Mlp(nn.Module):
         else:
             return output
 
-class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
+class GaussianPolicy(Mlp):
     def __init__(
             self,
             hidden_sizes,
@@ -229,6 +229,7 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
             # output_activation=torch.tanh,
             **kwargs
         )
+        self.max_action_range = 0.03
         self.min_log_std = min_log_std
         self.max_log_std = max_log_std
         self.log_std = None
@@ -271,7 +272,7 @@ class GaussianPolicy(Mlp):#, TorchStochasticPolicy):
             std = torch.from_numpy(np.array([self.std, ])).float().to(
                 ptu.device)
 
-        return MultivariateGaussian(mean, torch.log(std))#MultivariateDiagonalNormal(mean, std)
+        return MultivariateGaussian(mean, torch.log(std))
 
 class ConcatMlp(Mlp):
     """

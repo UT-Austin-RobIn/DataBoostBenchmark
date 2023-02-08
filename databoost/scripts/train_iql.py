@@ -1,22 +1,18 @@
-# import argparse
 import os
 import sys
-import random
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import wandb
 
-from databoost.base import DataBoostBenchmarkBase
+from databoost.base_iql import DataBoostBenchmarkBase
 from databoost.utils.data import dump_video_wandb
 from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
 from databoost.models.iql.iql import IQLModel
 
-# random.seed(42)
 
 def map_dict(fn, d):
     """takes a dictionary and applies the function to every element"""
@@ -41,17 +37,16 @@ def train(iql_policy,
 
     best_success_rate = [-1 for i in range(3)]
     min_success_best = 0
-
     global_step = iql_policy._n_train_steps_total
-    for epoch in tqdm(range(int(n_epochs))):
+    logs, agg = {}, {}
+    for epoch in range(int(n_epochs)):
         for cycle in range(n_epoch_cycles):
-            logs, agg = {}, {}
-            for batch_num, batch in enumerate(dataloader):
+            for _, batch in tqdm(enumerate(dataloader)):
                 log = iql_policy.train_from_torch(batch)
                 
                 for k in log:
                     if 'losses/' == k[:7] or 'values/' == k[:7]:
-                        logs[k] = logs[k]+(log[k]/len(dataloader)) if k in logs else log[k]/len(dataloader)
+                        logs[k] = logs[k]+(log[k]/2000) if k in logs else log[k]/2000
                     else:
                         parent = k.split('/')[0]
                         agg[k] = agg[k] + log[parent + '/num_samples'] if k in agg else log[parent + '/num_samples']
@@ -80,18 +75,22 @@ def train(iql_policy,
                         min_success_best = np.argmin(best_success_rate)
 
                     torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
-            
+
+                if global_step % 2000 == 0:
+                    torch.save(iql_policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-step{global_step}.pt"))
+
+                    for k in logs:
+                        if ('values_seed/' == k[:12] or 'values_prior/' == k[:13]) and agg[k] > 0:
+                            logs[k] /= agg[k]
+
+                    logs['values_seed/num_samples'] = agg['values_seed/num_samples']/(agg['values_seed/num_samples'] + agg['values_prior/num_samples'])
+                    logs['values_prior/num_samples'] = 1 - logs['values_seed/num_samples']
+                    logs['epochs'] = epoch*n_epoch_cycles + cycle
+                    wandb.log(logs, step=global_step)
+                    logs, agg = {}, {}
+
                 if global_step >= max_global_steps:
                     break
-
-            for k in logs:
-                if ('values_seed/' == k[:12] or 'values_prior/' == k[:13]) and agg[k] > 0:
-                    logs[k] /= agg[k]
-            logs['values_seed/num_samples'] = agg['values_seed/num_samples']/(agg['values_seed/num_samples'] + agg['values_prior/num_samples'])
-            logs['values_prior/num_samples'] = 1 - logs['values_seed/num_samples']
-            logs['epochs'] = epoch*n_epoch_cycles + cycle
-            wandb.log(logs, step=global_step)
-
             if global_step >= max_global_steps:
                 break
         if global_step >= max_global_steps:
@@ -101,42 +100,44 @@ def train(iql_policy,
 
 if __name__ == "__main__":
     import databoost
-    from databoost.models.bc import BCPolicy
 
-    benchmark_name = "metaworld"
-    task_name = "pick-place-wall"
-    boosting_method = ""
-    # version = "pick_place_wall/rl_30_seed5"
-    version = "nt_metaworld_boosting/nt_all_metaworld"
-    exp_name = f"{benchmark_name}-{task_name}-{version.replace('/', '_')}-{sys.argv[1]}"
-    dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/all"
+    benchmark_name = "language_table"
+    task_name = "separate"
+    boosting_method = "demo"
     goal_condition = False
+    mask_goal_pos = False
+    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-{sys.argv[1]}"
+    dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}/{sys.argv[1]}/"
 
-    dataloader_configs = {
-        "dataset_dir": f"/home/sdass/boosting/data/{version}",
-        "n_demos": None,
-        "batch_size": 256,
-        "seq_len": 2,
-        "shuffle": True,
-        "goal_condition": goal_condition,
-        "seed_sample_ratio": None,#0.5,
-        "terminal_sample_ratio": 0.01
+    benchmark_configs = {
+        "benchmark_name": benchmark_name,
     }
 
-    obs_dim = 39 * (2 if goal_condition else 1)
-    action_dim = 4
-    qf_kwargs = dict(hidden_sizes=[512, 512], layer_norm=True)
+    dataloader_configs = {
+        "n_demos": None,
+        "batch_size": 128,
+        "seq_len": 2,
+        "shuffle": True,
+        "load_imgs": False,
+        "goal_condition": goal_condition,
+        "seed_sample_ratio": 0.1,
+        "terminal_sample_ratio": 0.01,
+        "limited_cache_size": 500000,
+    }
+
+    obs_dim = 2048 + 512
+    action_dim = 2
+    qf_kwargs = dict(hidden_sizes=[512]*3, layer_norm=True)
 
     policy_configs = {
         "policy": GaussianPolicy(
                         obs_dim=obs_dim,
                         action_dim=action_dim,
-                        hidden_sizes=[512, 512, 512],
+                        hidden_sizes=[1024]*3,
                         max_log_std=0,
                         min_log_std=-6,
                         std_architecture="values",
                         hidden_activation=nn.LeakyReLU(),
-                        # output_activation=nn.Identity(),
                         layer_norm=True,
                     ).to(device),
         "qf1": ConcatMlp(
@@ -165,17 +166,14 @@ if __name__ == "__main__":
                         **qf_kwargs,
                     ).to(device),
 
-        "discount": 0.995,
-        "quantile": 0.7,
+        "discount": 0.99,
+        "quantile": 0.8,
         "clip_score": 100,
         "soft_target_tau": 0.005,
         "reward_scale": 10,
         "beta": 10.0,
         "policy_lr": 1e-3,
         "qf_lr": 1e-3,
-        # "policy_weight_decay": 0.01,
-        # "q_weight_decay": 0.01,
-        # "optimizer_class": torch.optim.AdamW,
         "device": device
     }
 
@@ -184,31 +182,32 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 2500,
-        "eval_episodes": 100,
-        "max_traj_len": 500,
-        "n_epochs": 10000, #iql : 1000
+        "eval_period": 1e5,
+        "eval_episodes": 20,
+        "max_traj_len": 60,
+        "n_epochs": 10000,
         "n_epoch_cycles": 5000,
         "n_save_best": 3,
-        "max_global_steps": 102501,
+        "max_global_steps": 5e5,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 100,
-        "max_traj_len": 500,
-        "goal_cond": goal_condition
+        "n_episodes": 50,
+        "max_traj_len": 60,
+        "goal_cond": goal_condition,
     }
 
     rollout_configs = {
         "task_name": task_name,
         "n_episodes": 10,
-        "max_traj_len": 500,
-        "goal_cond": goal_condition
+        "max_traj_len": 60,
+        "goal_cond": goal_condition,
     }
 
     configs = {
+        "benchmark_configs": benchmark_configs,
         "dataloader_configs": dataloader_configs,
         "policy_configs": policy_configs,
         "train_configs": train_configs,
@@ -226,33 +225,41 @@ if __name__ == "__main__":
     )
 
     os.makedirs(dest_dir, exist_ok=True)
-    benchmark = databoost.get_benchmark(benchmark_name)
+    benchmark = databoost.get_benchmark(**benchmark_configs)
     env = benchmark.get_env(task_name)
-    dataloader = env._get_dataloader(**dataloader_configs)
-    iql_policy = IQLModel(**policy_configs)
+    dataloader = env.get_combined_dataloader(**dataloader_configs)
 
+    iql_policy = IQLModel(**policy_configs)
     policy = train(iql_policy=iql_policy,
                    dataloader=dataloader,
                    benchmark=benchmark,
                    **train_configs)
 
-    torch.save(policy.get_all_state_dicts(), os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    '''Test the final checkpoint of the trained policy'''
+    final_policy = policy.detach().clone()
+    torch.save(final_policy, os.path.join(dest_dir, f"{exp_name}-last.pt"))
+    success_rate, _ = benchmark.evaluate(
+        policy=final_policy,
+        render=False,
+        **eval_configs
+    )
+    print(f"final success_rate: {success_rate}")
+    wandb.log({"final_success_rate": success_rate})
 
-    for i in range(train_configs['n_save_best']):
-        checkpoint = torch.load(os.path.join(dest_dir, f"{exp_name}-best{i}.pt"))
-        iql_policy.load_from_checkpoint(checkpoint, True)
-        success_rate, _ = benchmark.evaluate(
-            policy=iql_policy,
-            render=False,
-            **eval_configs
-        )
-        print(f"best success_rate: {success_rate}")
-        wandb.log({f"best_success_rate{i}": success_rate})
+    '''Test the best performing checkpoint of the trained policy'''
+    best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
+    success_rate, _ = benchmark.evaluate(
+        policy=best_policy,
+        render=False,
+        **eval_configs
+    )
+    print(f"best success_rate: {success_rate}")
+    wandb.log({"best_success_rate": success_rate})
 
-        # '''generate sample policy rollouts'''
-        # success_rate, gifs = benchmark.evaluate(
-        #     policy=iql_policy,
-        #     render=True,
-        #     **rollout_configs
-        # )
-        # dump_video_wandb(gifs, "rollouts{i}")
+    '''generate sample policy rollouts'''
+    success_rate, gifs = benchmark.evaluate(
+        policy=best_policy,
+        render=True,
+        **rollout_configs
+    )
+    dump_video_wandb(gifs, "rollouts")

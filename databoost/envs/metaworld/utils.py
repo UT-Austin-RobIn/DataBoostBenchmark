@@ -16,13 +16,15 @@ def initialize_env(env: MujocoEnv) -> MujocoEnv:
     env._partially_observable = True
     env._freeze_rand_vec = False
     env._set_task_called = True
+    env.reset()
     return env
 
 
 def render(env, **kwargs):
     camera = kwargs["camera"] if "camera" in kwargs else "corner"
     resolution = kwargs["resolution"] if "resolution" in kwargs else (224, 224)
-    if isinstance(env, DataBoostEnvWrapper): env = env.env
+    if isinstance(env, DataBoostEnvWrapper):
+        env = env.env
     im = env.render(
         camera_name=camera,
         resolution=resolution,

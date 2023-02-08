@@ -10,17 +10,17 @@ class Gaussian:
             mu, log_sigma = torch.chunk(mu, 2, -1)
         self.mu = mu
         self.log_sigma = torch.clamp(log_sigma, min=-10, max=2) \
-                         if isinstance(log_sigma, torch.Tensor) else \
-                         np.clip(log_sigma, a_min=-10, a_max=2)
+            if isinstance(log_sigma, torch.Tensor) else \
+            np.clip(log_sigma, a_min=-10, a_max=2)
         self._sigma = None
-        
+
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.sigma)
 
     def kl_divergence(self, other):
         """Here self=q and other=p and we compute KL(q, p)"""
         return (other.log_sigma - self.log_sigma) + (self.sigma ** 2 + (self.mu - other.mu) ** 2) \
-               / (2 * other.sigma ** 2) - 0.5
+            / (2 * other.sigma ** 2) - 0.5
 
     def nll(self, x):
         return -1 * self.log_prob(x)
@@ -62,7 +62,8 @@ class Gaussian:
     def average(self, dists):
         """Fits single Gaussian to a list of Gaussians."""
         mu_avg = torch.stack([d.mu for d in dists]).sum(0) / len(dists)
-        sigma_avg = torch.stack([d.mu ** 2 + d.sigma ** 2 for d in dists]).sum(0) - mu_avg**2
+        sigma_avg = torch.stack(
+            [d.mu ** 2 + d.sigma ** 2 for d in dists]).sum(0) - mu_avg**2
         return type(self)(mu_avg, torch.log(sigma_avg))
 
     def chunk(self, *args, **kwargs):
@@ -76,7 +77,7 @@ class Gaussian:
 
     def __getitem__(self, item):
         return Gaussian(self.mu[item], self.log_sigma[item])
- 
+
     def tensor(self):
         return torch.cat([self.mu, self.log_sigma], dim=-1)
 
@@ -107,12 +108,3 @@ class MultivariateGaussian(Gaussian):
     @staticmethod
     def cat(*argv, dim):
         return MultivariateGaussian(Gaussian.cat(*argv, dim=dim).tensor())
-
-
-def compute_batched(f, xs):
-    return f(torch.cat(xs, dim=0)).split([len(x) for x in xs])
-
-
-def update_exponential_moving_average(target, source, alpha):
-    for target_param, source_param in zip(target.parameters(), source.parameters()):
-        target_param.data.mul_(1. - alpha).add_(source_param.data, alpha=alpha)

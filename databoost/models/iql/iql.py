@@ -1,20 +1,13 @@
 """Torch implementation of Implicit Q-Learning (IQL)
 https://github.com/ikostrikov/implicit_q_learning
 """
-import abc
-import pickle
 from collections import OrderedDict
-from typing import Iterable
 
 import numpy as np
 import torch
 import torch.optim as optim
 from torch import nn as nn
 import databoost.models.iql.pytorch_utils as ptu
-# from rlkit.core.eval_util import create_stats_ordered_dict
-# from rlkit.core.logging import add_prefix
-import torch.nn.functional as F
-import time
 
 class LinearTransform(nn.Module):
     def __init__(self, m, b):
@@ -139,7 +132,6 @@ class IQLModel(nn.Module):
         actions = batch['actions'][:, 0].float().to(self.device)
         next_obs = batch['observations'][:, 1].float().to(self.device)
         seed_bool = batch['seed'][:, 0].int().detach().numpy()
-
         if self.reward_transform:
             rewards = self.reward_transform(rewards)
 
@@ -227,32 +219,32 @@ class IQLModel(nn.Module):
         prior_idx = np.where(seed_bool == 0)[0]
         
         logs = {
-            'losses/qf1_loss': qf1_loss.item(),
-            'losses/qf2_loss': qf2_loss.item(),
-            'losses/vf_loss': vf_loss.item(),
-            'losses/policy_loss': policy_loss.item(),
-            'values/vf': target_vf_pred.mean().item(),
-            'values/q_target': q_target.mean().item(),
-            'values/q1_pred': q1_pred.mean().item(),
-            'values/q2_pred': q2_pred.mean().item(),
-            'values/adv_weight': exp_adv.mean().item(),
+            'losses/qf1_loss': qf1_loss.detach().item(),
+            'losses/qf2_loss': qf2_loss.detach().item(),
+            'losses/vf_loss': vf_loss.detach().item(),
+            'losses/policy_loss': policy_loss.detach().item(),
+            'values/vf': target_vf_pred.mean().detach().item(),
+            'values/q_target': q_target.mean().detach().item(),
+            'values/q1_pred': q1_pred.mean().detach().item(),
+            'values/q2_pred': q2_pred.mean().detach().item(),
+            'values/adv_weight': exp_adv.mean().detach().item(),
             
             # seed specific logs
-            'values_seed/vf': target_vf_pred[seed_idx].sum().item(),
-            'values_seed/q_target': q_target[seed_idx].sum().item(),
-            'values_seed/q1_pred': q1_pred[seed_idx].sum().item(),
-            'values_seed/q2_pred': q2_pred[seed_idx].sum().item(),
-            'values_seed/dones': terminals[seed_idx].sum().item(),
-            'values_seed/rewards': rewards[seed_idx].sum().item(),
+            'values_seed/vf': target_vf_pred[seed_idx].sum().detach().item(),
+            'values_seed/q_target': q_target[seed_idx].sum().detach().item(),
+            'values_seed/q1_pred': q1_pred[seed_idx].sum().detach().item(),
+            'values_seed/q2_pred': q2_pred[seed_idx].sum().detach().item(),
+            'values_seed/dones': terminals[seed_idx].sum().detach().item(),
+            'values_seed/rewards': rewards[seed_idx].sum().detach().item(),
             'values_seed/num_samples': len(seed_idx),
 
             # prior specific logs
-            'values_prior/vf': target_vf_pred[prior_idx].sum().item(),
-            'values_prior/q_target': q_target[prior_idx].sum().item(),
-            'values_prior/q1_pred': q1_pred[prior_idx].sum().item(),
-            'values_prior/q2_pred': q2_pred[prior_idx].sum().item(),
-            'values_prior/dones': terminals[prior_idx].sum().item(),
-            'values_prior/rewards': rewards[prior_idx].sum().item(),
+            'values_prior/vf': target_vf_pred[prior_idx].sum().detach().item(),
+            'values_prior/q_target': q_target[prior_idx].sum().detach().item(),
+            'values_prior/q1_pred': q1_pred[prior_idx].sum().detach().item(),
+            'values_prior/q2_pred': q2_pred[prior_idx].sum().detach().item(),
+            'values_prior/dones': terminals[prior_idx].sum().detach().item(),
+            'values_prior/rewards': rewards[prior_idx].sum().detach().item(),
             'values_prior/num_samples': len(prior_idx)
         }
 
