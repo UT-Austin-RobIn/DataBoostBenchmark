@@ -1,30 +1,39 @@
 import os
-import random
-
+import numpy as np
 import torch
 
 import databoost
 
 
-random.seed(42)
-
-
-# train/load a policy
+# Evaluation configs
 benchmark = "metaworld"
-task = "assembly"
-policy_dir = f"/data/jullian-yapeter/DataBoostBenchmark/{benchmark}/models"
-policy_filename = f"seed_{benchmark}_{task}_policy_3.pt"
-policy = torch.load(os.path.join(policy_dir, policy_filename))
+task = "pick-place-wall"
+n_episodes = 300
+max_traj_len = 500
+goal_cond = True
+render = False
+#  Choose policy to evaluate
+policy_path = "sample_trained_policy.pt"
 
-print(f"evaluating {policy_filename} on {task} task")
-# initialize appropriate benchmark with corresponding task
+
 benchmark = databoost.get_benchmark(benchmark)
+policy = torch.load(policy_path)
+print(f"evaluating {policy_path} on {task} task")
+# initialize appropriate benchmark with corresponding task
 # evaluate the policy using the benchmark
 success_rate, gif = benchmark.evaluate(
     task_name=task,
     policy=policy,
-    n_episodes=100,
-    max_traj_len=500,
-    render=False
+    n_episodes=n_episodes,
+    max_traj_len=max_traj_len,
+    render=render,
+    goal_cond=goal_cond
 )
 print(f"policy success rate: {success_rate}")
+
+if render and gif is not None:
+    from PIL import Image
+    imgs = [Image.fromarray(img) for img in gif]
+    gif_dest_path = policy_path.replace(".pt", ".gif")
+    imgs[0].save(gif_dest_path, save_all=True,
+                 append_images=imgs[1:], duration=100, loop=0)

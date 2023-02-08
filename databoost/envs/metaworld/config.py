@@ -1,10 +1,9 @@
 import os
 
 from metaworld.envs.mujoco.env_dict import ALL_V2_ENVIRONMENTS as ALL_V2_ENVS
+import metaworld.policies as policies
 
 from databoost.utils.general import AttrDict
-
-import metaworld.policies as policies
 
 
 '''General configs'''
@@ -13,19 +12,19 @@ env_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld"
 
 '''Tasks configs'''
 tasks = {
-    "assembly": AttrDict({
-        "task_name": "assembly",
-        "env": ALL_V2_ENVS["assembly-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
-        "test_dataset": os.path.join(env_root, "test/assembly"),
-        "expert_policy": policies.SawyerAssemblyV2Policy,
-    }),
     "pick-place-wall": AttrDict({
         "task_name": "pick-place-wall",
         "env": ALL_V2_ENVS["pick-place-wall-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
         "test_dataset": os.path.join(env_root, "test/pick-place-wall"),
         "expert_policy": policies.SawyerPickPlaceWallV2Policy,
+    }),
+    "assembly": AttrDict({
+        "task_name": "assembly",
+        "env": ALL_V2_ENVS["assembly-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
+        "test_dataset": os.path.join(env_root, "test/assembly"),
+        "expert_policy": policies.SawyerAssemblyV2Policy,
     }),
     "door-open": AttrDict({
         "task_name": "door-open",
@@ -54,6 +53,20 @@ tasks = {
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
         "test_dataset": os.path.join(env_root, "test/coffee-push"),
         "expert_policy": policies.SawyerCoffeePushV2Policy,
+    }),
+    "coffee-pull": AttrDict({
+        "task_name": "coffee-pull",
+        "env": ALL_V2_ENVS["coffee-pull-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
+        "test_dataset": os.path.join(env_root, "test/coffee-pull"),
+        "expert_policy": policies.SawyerCoffeePullV2Policy,
+    }),
+    "stick-pull": AttrDict({
+        "task_name": "stick-pull",
+        "env": ALL_V2_ENVS["stick-pull-v2"],
+        "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
+        "test_dataset": os.path.join(env_root, "test/stick-pull"),
+        "expert_policy": policies.SawyerStickPullV2Policy,
     }),
     "door-close": AttrDict({
         "task_name": "door-close",
@@ -120,12 +133,6 @@ tasks = {
         "env": ALL_V2_ENVS["coffee-button-v2"],
         "seed_dataset": os.path.join(env_root, "data/seed/coffee-button"),
         "expert_policy": policies.SawyerCoffeeButtonV2Policy,
-    }),
-    "coffee-pull": AttrDict({
-        "task_name": "coffee-pull",
-        "env": ALL_V2_ENVS["coffee-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
-        "expert_policy": policies.SawyerCoffeePullV2Policy,
     }),
     "dial-turn": AttrDict({
         "task_name": "dial-turn",
@@ -271,12 +278,6 @@ tasks = {
         "seed_dataset": os.path.join(env_root, "data/seed/stick-push"),
         "expert_policy": policies.SawyerStickPushV2Policy,
     }),
-    "stick-pull": AttrDict({
-        "task_name": "stick-pull",
-        "env": ALL_V2_ENVS["stick-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
-        "expert_policy": policies.SawyerStickPullV2Policy,
-    }),
     "push-wall": AttrDict({
         "task_name": "push-wall",
         "env": ALL_V2_ENVS["push-wall-v2"],
@@ -324,31 +325,26 @@ tasks = {
 
 '''Seed tasks configs'''
 seed_tasks_list = [
-    "assembly",
     "pick-place-wall",
-    "door-open",
-    "plate-slide-back-side",
-    "coffee-push"
 ]
-seed_dataset_dir = os.path.join(env_root, "data/large_seed")
-seed_n_demos = 50
+seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_n_demos = 5
 seed_do_render = True
 seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.05,
+    "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
 })
 
 
-'''Prior tasks configs'''
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/prior/fail")
-prior_n_demos = 50
+prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_n_demos = 85
 prior_do_render = True
 prior_save_env_and_goal = False
 prior_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.7,
+    "act_noise_pct": 0.1,
     "resolution": (224, 224),
     "camera": "corner"
 })
@@ -356,14 +352,10 @@ prior_dataset_kwargs = AttrDict({
 
 '''Test tasks configs'''
 test_tasks_list = [
-    "assembly",
     "pick-place-wall",
-    "door-open",
-    "plate-slide-back-side",
-    "coffee-push"
 ]
-test_dataset_dir = os.path.join(env_root, "test")
-test_n_demos = 100
+test_dataset_dir = os.path.join(env_root, "data/test")
+test_n_demos = 300
 test_do_render = True
 test_save_env_and_goal = True
 test_dataset_kwargs = AttrDict({
