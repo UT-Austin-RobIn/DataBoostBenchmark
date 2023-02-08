@@ -117,7 +117,7 @@ class DatasetSaver:
         # make dataset
         dataset_path = os.path.join(self._dataset_directories[dataset_name], '0.0.1')
         builder = tfds.builder_from_directory(dataset_path)
-        episode_ds = builder.as_dataset(split='train[65%:80%]')
+        episode_ds = builder.as_dataset(split='train[:50%]')
 
         # choose data size
         if n_episodes < 0:
