@@ -7,10 +7,16 @@ import numpy as np
 from tqdm import tqdm
 
 total_len = 0
-file_paths = find_h5("/data/karl/data/language_table/rl_episodes")
+file_paths = find_h5("/data/karl/data/table_sim/rollout_data/batch17")
+# file_paths += find_h5("/home/karl/data/language_table/prior_data_clip")
 # file_paths += find_h5("/data/karl/data/language_table/rl_episodes")
+max_action = 0
+min_action = 999
 for file_path in tqdm(file_paths):
-    curr_len = len(read_h5(file_path).actions)
+    actions = read_h5(file_path).actions
+    curr_len = len(actions)
+    max_action = max(max_action, np.max(actions))
+    min_action = min(min_action, np.min(actions))
     # if curr_len > max_len:
     #     max_len = curr_len
     #     max_file = file_path
@@ -22,6 +28,8 @@ for file_path in tqdm(file_paths):
 print(f"total_len: {total_len}")
 print(f"total_files: {len(file_paths)}")
 print(f"avg_len: {total_len//len(file_paths)}")
+print(f"max_action: {max_action}")
+print(f"min_action: {min_action}")
 # print(f"max_len: {max_len}, {max_file}")
 # print(f"min_len: {min_len}, {min_file}")
 # print(f"std: {np.std(lens)}")

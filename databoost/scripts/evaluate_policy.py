@@ -19,13 +19,13 @@ random.seed(42)
 # parser.add_argument("--n_window", help="num success prior groups")
 # args = parser.parse_args()
 
-policy_dir = "/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC"
+policy_dir = "/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC_0pt1_9"
 benchmark = "language_table"
 task = "separate"
 # n_chkpt = int(500000 * 0.25)
-n_chkpt = int(63000)
+n_chkpt = int(125000)
 n_window = 5
-n_period = 2e3
+n_period = 1e3
 n_episodes = 20
 
 benchmark = databoost.get_benchmark(benchmark)
@@ -64,4 +64,4 @@ metrics = {
     "min": np.min(success_rates),
     "mean": np.mean(success_rates)
 }
-write_json(metrics, os.path.join(policy_dir, f"metrics-chkpt_{int(n_chkpt)}-window_{int(n_window)}-per_{int(n_period)}.json"))
+write_json(metrics, os.path.join(policy_dir, f"{task}_metrics-chkpt_{int(n_chkpt)}-window_{int(n_window)}-per_{int(n_period)}.json"))

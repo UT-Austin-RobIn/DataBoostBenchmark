@@ -15,7 +15,7 @@ from tqdm import tqdm
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
     find_pkl,
-    find_h5, read_h5, write_h5,
+    find_h5, read_h5, write_h5, read_json,
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
@@ -367,10 +367,6 @@ class DataBoostDataset(Dataset):
         self.paths = []
         self.path_lens = {}
 
-        # ######### Load in handcrafted files
-        # file_paths = read_json("databoost/envs/language_table/selected_seeds.json")
-        # #########
-
         if type(dataset_dir) in (list, tuple):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
@@ -384,6 +380,11 @@ class DataBoostDataset(Dataset):
             if no_target and "metaworld" in dataset_dir:
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
+
+        # ######### Load in handcrafted files
+        # print("Oracle appending...")
+        # file_paths += read_json("/home/jullian-yapeter/code/data_boost/selected_seeds.json")
+        # #########
 
         print(f"found {len(file_paths)} files")
         #file_paths = file_paths[:1000]
