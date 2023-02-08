@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     '''generate sample policy rollouts'''
     success_rate, gifs = benchmark.evaluate(
-        policy=policy,
+        policy=best_policy,
         render=True,
         **rollout_configs
     )
