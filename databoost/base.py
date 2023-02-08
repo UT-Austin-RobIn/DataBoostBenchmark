@@ -358,7 +358,6 @@ class DataBoostBenchmarkBase:
                     pad = [last_frame for _ in range(max_traj_len - len(gif))]
                     gif += pad
                 gifs.append(np.stack(gif))
-            # print(f"successes: {n_successes}")
         success_rate = n_successes / n_episodes
         if render:
             gifs = np.concatenate(gifs, axis=-1)
