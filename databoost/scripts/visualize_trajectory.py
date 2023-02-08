@@ -23,7 +23,8 @@ def visualize_h5(path: str):
         # save videos to in a directory called "movies" at the same directory
         # level as the original h5 file
         root, filename = os.path.split(path)
-        dest_filename = filename.replace(".h5", ".avi").replace(".hdf5", ".avi")
+        dest_filename = filename.replace(
+            ".h5", ".avi").replace(".hdf5", ".avi")
         dest_root = os.path.join(root, "movies")
         os.makedirs(dest_root, exist_ok=True)
         dest_path = os.path.join(dest_root, dest_filename)
@@ -40,7 +41,7 @@ def visualize_h5(path: str):
         # write images of dataset to a video and save
         writer = cv2.VideoWriter(
             dest_path,
-            cv2.VideoWriter_fourcc('M','J','P','G'),
+            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
             fps,
             resolution
         )

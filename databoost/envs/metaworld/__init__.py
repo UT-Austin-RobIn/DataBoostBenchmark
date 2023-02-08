@@ -2,7 +2,6 @@ import copy
 from typing import Dict
 
 import gym
-import metaworld
 import numpy as np
 
 from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase

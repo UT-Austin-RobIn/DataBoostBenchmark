@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import pickle
 from typing import Any, List, Dict, Tuple
 
 import h5py
@@ -9,6 +10,11 @@ import torch
 import wandb
 
 from databoost.utils.general import AttrDict
+
+
+LTD_CACHE_MAX = 30000
+GOAL_DIST = 200
+GOAL_WINDOW = 10
 
 
 def find_pkl(dir: str) -> List[str]:
@@ -26,6 +32,14 @@ def find_pkl(dir: str) -> List[str]:
                 file_paths.append(os.path.join(root, file))
     file_paths.sort()
     return file_paths
+
+
+def read_pkl(path: str) -> Dict:
+    '''read pickle file'''
+    with open(path, 'rb') as f:
+        traj = None
+        traj = pickle.load(f)
+    return traj
 
 
 def find_h5(dir: str) -> List[str]:
@@ -55,9 +69,6 @@ def read_h5(path: str, load_imgs: bool = True) -> Dict:
     def unpack_h5_recurse(h5_data):
         data = AttrDict()
         for key in h5_data.keys():
-            if key == "infos":  # temp
-                data[key] = {}
-                continue
             if not load_imgs and key == "imgs":
                 continue
             elif hasattr(h5_data[key], "keys") and callable(h5_data[key].keys):
@@ -82,7 +93,7 @@ def write_h5(data: Dict, dest_path: str):
         for attr, val in data.items():
             if isinstance(val, dict):
                 pack_h5_recurse(h5_file, val,
-                                prefix=f"{prefix}/{attr}" if prefix is not None \
+                                prefix=f"{prefix}/{attr}" if prefix is not None
                                 else attr)
             else:
                 if prefix is None:
@@ -134,14 +145,17 @@ def concatenate_traj_data(trajs: Tuple[AttrDict]) -> AttrDict:
                     traj_concat[attr] = {}
                 concat_traj_data_recurse(traj_concat[attr], val, traj_len)
                 continue
-            # assert isinstance(val, np.ndarray), f"attribute is of type {type(val)}"
-            # assert len(val) == traj_len
-            if not hasattr(val, "__len__"): val = [val]
-            if len(val) != traj_len: val = [val for _ in range(traj_len)]
+            # assert isinstance(val, np.ndarray), f"attribute {attr} is of type {type(val)}"
+            # assert len(val) == traj_len, f"len of {attr} is not {traj_len}"
+            if not hasattr(val, "__len__"):
+                val = [val]
+            if len(val) != traj_len:
+                val = [val for _ in range(traj_len)]
             if attr not in traj_concat:
                 traj_concat[attr] = val
             elif isinstance(val, np.ndarray):
-                traj_concat[attr] = np.concatenate((traj_concat[attr], val), axis=0)
+                traj_concat[attr] = np.concatenate(
+                    (traj_concat[attr], val), axis=0)
             else:
                 traj_concat[attr] += val
 
@@ -164,7 +178,8 @@ def get_start_end_idxs(traj_len: int,
         start_end_idxs [List[Tuple[int]]]: numpy array of start & end indices, shape (num slices, 2)
     '''
     num_slices = int((traj_len - window) / stride + 1)
-    start_end_idxs = [[idx * stride, idx * stride + window] for idx in range(num_slices)]
+    start_end_idxs = [[idx * stride, idx * stride + window]
+                      for idx in range(num_slices)]
     # if the end of the trajectory has not been included, add it in
     if keep_last and (traj_len - window) % stride != 0:
         start_end_idxs.append([traj_len - window, traj_len])
@@ -175,42 +190,39 @@ def get_traj_slice(traj_data: Dict,
                    traj_len: int,
                    slice_start_idx: int,
                    slice_end_idx: int):
-        '''Slice a dictionary of trajectory data to the specified start and end
-        indices.
+    '''Slice a dictionary of trajectory data to the specified start and end
+    indices.
 
-        Args:
-            traj_data [Dict]: the dictionary of trajectory data to be sliced
-            traj_len [int]: the length (steps) of the given trajectory data
-            slice_start_idx [int]: the starting index of the subsequence to be
-                                   returned
-            slice_end_idx [int]: 1 + the ending index of the subsequence to be
-                                 returned
-        '''
-        seq_len = slice_end_idx - slice_start_idx
-        traj_seq = {}
-        for attr in traj_data:
-            if isinstance(traj_data[attr], dict):
-                # if it's a nested dictionary, recursively call this slice function
-                traj_seq[attr] = get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
-            elif isinstance(traj_data[attr], np.ndarray) and traj_data[attr].shape[0] == traj_len:
-                traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].copy()
-                # assert that each attribute will have shape (seq_len, *attribute shape)
-                assert len(traj_seq[attr]) == seq_len
-            elif isinstance(traj_data[attr], torch.Tensor) and traj_data[attr].shape[0] == traj_len:
-                traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].clone()
-                # assert that each attribute will have shape (seq_len, *attribute shape)
-                assert len(traj_seq[attr]) == seq_len
-            else:
-                # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-                raise "Somehting is wrong"
-                # traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
-        return traj_seq
+    Args:
+        traj_data [Dict]: the dictionary of trajectory data to be sliced
+        traj_len [int]: the length (steps) of the given trajectory data
+        slice_start_idx [int]: the starting index of the subsequence to be
+                                returned
+        slice_end_idx [int]: 1 + the ending index of the subsequence to be
+                                returned
+    '''
+    seq_len = slice_end_idx - slice_start_idx
+    traj_seq = {}
+    for attr in traj_data:
+        if isinstance(traj_data[attr], dict):
+            # if it's a nested dictionary, recursively call this slice function
+            traj_seq[attr] = get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
+        elif isinstance(traj_data[attr], np.ndarray) and traj_data[attr].shape[0] == traj_len:
+            traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].copy()
+            # assert that each attribute will have shape (seq_len, *attribute shape)
+            assert len(traj_seq[attr]) == seq_len
+        elif isinstance(traj_data[attr], torch.Tensor) and traj_data[attr].shape[0] == traj_len:
+            traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].clone()
+            # assert that each attribute will have shape (seq_len, *attribute shape)
+            assert len(traj_seq[attr]) == seq_len
+        else:
+            # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
+            traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
+    return traj_seq
 
 
-def dump_video_wandb(vid, tag, entity=None, project=None, fps=20):
+def dump_video_wandb(vid, tag, fps=20):
     assert len(vid.shape) == 4 and vid.shape[1] == 3
     if vid.max() <= 1.0:
         vid = np.asarray(vid * 255.0, dtype=np.uint8)
-    if entity is not None and project is not None:
-        init_wandb(entity, project)
     wandb.log({tag: [wandb.Video(vid, fps=fps, format="mp4")]})

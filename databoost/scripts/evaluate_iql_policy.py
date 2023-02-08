@@ -1,19 +1,11 @@
-import os
-import random
-import argparse
-
 import torch
 import numpy as np
 
 import databoost
-from databoost.utils.data import write_json
 from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
 from torch import nn as nn
 from databoost.models.iql.iql import IQLModel
-from databoost.models.bc import BCPolicy, TanhGaussianBCPolicy
-from databoost.utils.general import AttrDict
 
-# random.seed(42)
 
 exp_name = "iql-og-again"
 boosting_method = "demo"
@@ -44,21 +36,6 @@ policy_configs = {
                     # output_activation=nn.Identity(),
                     layer_norm=True,
                 ).to(device),
-    # "policy": TanhGaussianBCPolicy(
-    #                     env_spec = AttrDict({
-    #                         "observation_space": AttrDict({
-    #                             "flat_dim": 2048 + 512
-    #                         }),
-    #                         "action_space": AttrDict({
-    #                             "flat_dim": 2
-    #                         })
-    #                     }),
-    #                     hidden_sizes = [512, 512, 512, 512],
-    #                     hidden_nonlinearity= nn.LeakyReLU(),
-    #                     output_nonlinearity= None,
-    #                     min_std =  np.exp(-20.),
-    #                     max_std = np.exp(2.)
-    #                 ).to(device),
     "qf1": ConcatMlp(
                     input_size=obs_dim + action_dim,
                     output_size=1,
@@ -102,7 +79,6 @@ policy_configs = {
 benchmark = databoost.get_benchmark(benchmark)
 success_rates = []
 
-# policy = torch.load(policy_filename)
 policy = IQLModel(**policy_configs)
 for idx in range(n_window):
     chkpt = int(n_chkpt - idx * n_period)
@@ -122,12 +98,3 @@ for idx in range(n_window):
     print(f"policy success rate: {success_rate}")
     success_rates.append(success_rate)
     print(f"avg success: {np.mean(success_rates)}")
-    # metrics = {
-    #     "window": n_window,
-    #     "period": n_period,
-    #     "n_episodes": n_episodes,
-    #     "max": np.max(success_rates),
-    #     "min": np.min(success_rates),
-    #     "mean": np.mean(success_rates)
-    # }
-    # write_json(metrics, os.path.join(policy_dir, f"metrics-chkpt_-window_{int(n_window)}-per_{int(n_period)}.json"))

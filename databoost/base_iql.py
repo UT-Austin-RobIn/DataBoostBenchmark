@@ -6,20 +6,19 @@ from typing import Callable, Dict, Tuple
 
 import gym
 import numpy as np
+import random
 import torch
 import torch.nn as nn
 from torch.utils.data import (
-    Dataset, DataLoader, LTD_CACHE_MAX,
-    GOAL_DIST, GOAL_WINDOW
+    Dataset, DataLoader, LTD_CACHE_MAX
 )
 from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
-    find_pkl, find_h5, read_h5, write_h5,
-    get_start_end_idxs, concatenate_traj_data, get_traj_slice
+    find_pkl, find_h5, read_h5,
+    write_h5, concatenate_traj_data
 )
-
 
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
@@ -87,7 +86,10 @@ class DataBoostEnvWrapper(gym.Wrapper):
                         batch_size: int = 1,
                         shuffle: bool = True,
                         load_imgs: bool = True,
-                        goal_condition: bool = False) -> DataLoader:
+                        goal_condition: bool = False,
+                        seed_sample_ratio: float = None,
+                        terminal_sample_ratio: float = None,
+                        limited_cache_size: float = LTD_CACHE_MAX) -> DataLoader:
         '''gets a dataloader to load in h5 data from the given dataset_dir.
 
         Args:
@@ -100,8 +102,14 @@ class DataBoostEnvWrapper(gym.Wrapper):
         Returns:
             dataloader [DataLoader]: DataLoader for given dataset directory
         '''
-        dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, load_imgs=load_imgs,
-                                   postproc_func=self.postproc_func, goal_condition=goal_condition)
+        dataset = DataBoostDataset(
+            dataset_dir, n_demos, seq_len,
+            load_imgs=load_imgs,
+            postproc_func=self.postproc_func,
+            goal_condition=goal_condition,
+            seed_sample_ratio=seed_sample_ratio,
+            terminal_sample_ratio=terminal_sample_ratio,
+            limited_cache_size=limited_cache_size)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_seed_dataset(self, n_demos: int = None) -> Dataset:
@@ -345,11 +353,13 @@ class DataBoostBenchmarkBase:
                     if goal_cond:
                         ob = np.concatenate((ob, goal_ob), axis=-1)
                     act = policy.get_action(ob)
+
                 ob, rew, done, info = env.step(act)
                 if render:
                     gif.append(env.default_render().transpose(2, 0, 1)[::-1])
                 if self.evaluate_success(env, ob, rew, done, info):
                     n_successes += 1
+                    print(n_successes)
                     break
             if render and len(gif) > 0:
                 if len(gif) < max_traj_len:
@@ -372,7 +382,10 @@ class DataBoostDataset(Dataset):
                  seq_len: int = None,
                  load_imgs: bool = True,
                  postproc_func: Callable = None,
-                 goal_condition: bool = False):
+                 goal_condition: bool = False,
+                 seed_sample_ratio: float = None,
+                 terminal_sample_ratio: float = None,
+                 limited_cache_size: int = 10000):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
         Will return AttrDict object where each attribute is of shape:
@@ -399,7 +412,7 @@ class DataBoostDataset(Dataset):
             paths [List[str]]: list of h5 file paths to load in
             slices [List[Tuple[int]]]: list of tuples (path, start_idx, end_idx)
         '''
-        self.limited_data_cache = {}
+        self.limited_cache_size = limited_cache_size
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
         self.goal_condition = goal_condition
@@ -412,95 +425,51 @@ class DataBoostDataset(Dataset):
                 file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
-        if self.seq_len is None:
-            if n_demos is None:
-                n_demos = len(file_paths)
-            # if no seq_len is given, no need to proceed with slicing.
-            # use whole trajectories.
-            assert len(file_paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(file_paths)}"
-            self.paths = random.sample(file_paths, n_demos)
 
-            self.slices = []
-            print("loading files")
-            for path_id, path in tqdm(enumerate(self.paths), total=len(self.paths)):
-                traj_data = read_h5(path, load_imgs=load_imgs)
-                if postproc_func is not None:
-                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                        postproc_func(traj_data.get("observations"), traj_data.get(
-                            "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
-                    if "goal_observations" in traj_data:
-                        traj_data["goal_observations"], _, _, _ = \
-                            postproc_func(
-                                traj_data["goal_observations"], None, None, None)
-                traj_len = self.get_traj_len(traj_data)
-                self.path_lens[path] = traj_len
-                # [TEMP] for speed, cache everything
-                self.limited_data_cache[path] = traj_data
-                #####
-                self.slices.append((path_id, 0, traj_len))
-            print(f"Dataloader contains {len(self.slices)} slices")
-            return
+        self.seed_data = []
+        self.seed_lens = 0
+        
+        self.prior_data = {}
+        self.prior_paths = []
+        self.prior_lens = 0
+        for files in tqdm(file_paths):
+            if ('seed' not in files) and len(self.prior_data.keys()) >= self.limited_cache_size:
+                self.prior_paths.append(files)
+                continue
 
-        # filter for files that are long enough
-        print("filtering files of sufficient length")
-        for file_path in tqdm(file_paths):
-            traj_data = read_h5(file_path, load_imgs=load_imgs)
-            if postproc_func is not None:
-                traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                    postproc_func(traj_data.get("observations"), traj_data.get(
-                        "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
-            traj_len = self.get_traj_len(traj_data)
-            if traj_len >= seq_len:  # traj must be long enough
-                if postproc_func is not None:
-                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                        postproc_func(traj_data.get("observations"), traj_data.get(
-                            "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
-                    if "goal_observations" in traj_data:
-                        traj_data["goal_observations"], _, _, _ = \
-                            postproc_func(
-                                traj_data["goal_observations"], None, None, None)
-                        # If the trajectory has a goal_observations field, and
-                        # we want goal-conditioned observations (self.goal_condition == True)
-                        # then, we concatenate each sequence's goal observation
-                        # to each observation of the sequence
-                        if self.goal_condition:
-                            traj_data["observations"] = np.concatenate(
-                                (traj_data["observations"], np.repeat(traj_data["goal_observations"][None], len(traj_data["observations"]), axis=0)), axis=-1)
-                self.paths.append(file_path)
-                # [TEMP] for speed, cache everything
-                self.limited_data_cache[file_path] = traj_data
-                #####
-                self.path_lens[file_path] = traj_len
-        print(f"{len(self.paths)}/{len(file_paths)} trajectories "
-              "are of sufficient length")
-        if n_demos is None:
-            n_demos = len(self.paths)
-        assert len(self.paths) >= n_demos, \
-            f"given n_demos too large. Max is {len(self.paths)}"
-        self.paths = random.sample(self.paths, n_demos)
+            traj = read_h5(files)
+            traj_len = self.get_traj_len(traj)
+            
+            for k in  ['file_paths', 'start_end_idxs', 'infos', 'info', 'imgs']:
+                if k in traj:
+                    del traj[k]
+            for k in traj:
+                traj[k] = np.concatenate((np.array(traj[k]).reshape(traj_len, -1), np.zeros_like(traj[k][0]).reshape(1, -1)), axis=0)
 
-        self.slices = []
-        if self.goal_condition and "goal_observations" not in traj_data:
-            # If traj doesn't already carry its own goals in "goal_observations"
-            # then we generate goals based on a fixed distance ahead.
-            # We use 200 (GOAL_DIST) as the default, with a random window of 10
-            # (GOAL_WINDOW).
-            self.pretrain_goals = []
-        for path_id, path in enumerate(self.paths):
-            traj_len = self.path_lens[path]
-            start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
-            traj_slices = [(path_id, *start_end_idx)
-                           for start_end_idx in start_end_idxs]
-            self.slices += traj_slices
-            if self.goal_condition and "goal_observations" not in traj_data:
-                max_goal_idxs = [
-                    min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
-                min_goal_idxs = [
-                    max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
-                self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
-        print(f"Dataloader contains {len(self.slices)} slices")
+            traj['dones'] = np.zeros(traj_len+1)
+            traj['dones'][-2] = 1.
+            traj['rewards'] = np.zeros(traj_len+1)
+            if 'Seed' in files or 'seed' in files:   
+                traj['rewards'][-2] = 1.
+                traj['seed'] = np.ones(traj_len+1)
+                
+                self.seed_lens += traj_len
+                self.seed_data.append(traj)
+            else:
+                self.prior_paths.append(files)
+                traj['seed'] = np.zeros(traj_len+1)
+                self.prior_data[files] = traj
+                self.prior_lens += traj_len
+        
+        if len(self.prior_data.keys()) >= self.limited_cache_size:
+            self.prior_lens = int(self.prior_lens*len(self.prior_paths)/self.limited_cache_size)
 
+        print("Seed len", self.seed_lens)
+        print("Prior len", self.prior_lens)
+
+        self.seed_sample_ratio = self.seed_lens/len(self) if seed_sample_ratio is None else seed_sample_ratio   
+        self.terminal_sample_ratio = terminal_sample_ratio*self.seed_sample_ratio if terminal_sample_ratio is not None else None
+        
     def __len__(self) -> int:
         '''returns length of the dataset; number of traj slices associated with
         this dataset.
@@ -508,7 +477,23 @@ class DataBoostDataset(Dataset):
         Returns:
             len(self.slices) [int]: number of traj slices that the dataset can sample
         '''
-        return len(self.slices)
+        return self.seed_lens + self.prior_lens
+
+    def process_prior_file_for_iql(self, files):
+        traj = read_h5(files)
+        traj_len = self.get_traj_len(traj)
+
+        for k in  ['file_paths', 'start_end_idxs', 'infos', 'info', 'imgs']:
+                if k in traj:
+                    del traj[k]
+        for k in traj:
+            traj[k] = np.concatenate((np.array(traj[k]).reshape(traj_len, -1), np.zeros_like(traj[k][0]).reshape(1, -1)), axis=0)        
+        traj['dones'] = np.zeros(traj_len+1)
+        traj['dones'][-2] = 1
+        traj['rewards'] = np.zeros(traj_len+1)
+        traj['seed'] = np.zeros(traj_len+1)
+
+        return traj
 
     def __getitem__(self, idx: int) -> Dict:
         '''get item from the dataset; a dictionary of trajectory data.
@@ -520,32 +505,34 @@ class DataBoostDataset(Dataset):
                              subsequence of specified seq_len; or use whole
                              trajectory if seq_len was not specified
         '''
-        path_id, start_idx, end_idx = self.slices[idx]
-        if self.paths[path_id] in self.limited_data_cache:
-            traj_data = self.limited_data_cache[self.paths[path_id]]
+        r = np.random.random()
+        if self.prior_lens == 0 or r < self.seed_sample_ratio:
+            seq_idx = np.random.randint(len(self.seed_data))
+            traj_len = self.get_traj_len(self.seed_data[seq_idx])
+
+            if self.terminal_sample_ratio and r < self.terminal_sample_ratio:
+                sample_idx = traj_len - 2
+            else:
+                sample_idx = np.random.randint(traj_len-1)
+            return {
+                "observations": self.seed_data[seq_idx]["observations"][sample_idx: sample_idx+2].copy(),
+                "actions": (self.seed_data[seq_idx]["actions"][sample_idx: sample_idx+2]).copy(),
+                "rewards": self.seed_data[seq_idx]["rewards"][sample_idx: sample_idx+2].copy(),
+                "dones": self.seed_data[seq_idx]["dones"][sample_idx: sample_idx+2].copy(),
+                "seed": self.seed_data[seq_idx]["seed"][sample_idx: sample_idx+2].copy(),
+            }
         else:
-            traj_data = read_h5(self.paths[path_id])
-            if len(self.limited_data_cache) > LTD_CACHE_MAX:
-                self.limited_data_cache.pop(
-                    list(self.limited_data_cache.keys())[0])
-                raise ValueError
-            self.limited_data_cache[path_id] = traj_data
-        if self.seq_len is None:
-            return traj_data
-        traj_len = self.path_lens[self.paths[path_id]]
-        traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
-        if self.goal_condition and "goal_observations" not in traj_data:
-            # Use this code to get a random goal from within the window,
-            # currently use last frame of traj data (end of h5 file).
-            # goal_idx = random.randint(goal_min_idx, goal_max_idx)
-            # goal_frame = get_traj_slice(
-            #     traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
-            #####
-            _, goal_max_idx = self.pretrain_goals[idx]
-            goal_obs = traj_data["observations"][goal_max_idx].copy()[None]
-            traj_seq["observations"] = np.concatenate(
-                (traj_seq["observations"], np.repeat(goal_obs, self.seq_len, axis=-2)), axis=-1)
-        return traj_seq
+            filename = self.prior_paths[np.random.randint(len(self.prior_paths))]
+
+            traj_len = self.get_traj_len(self.prior_data[filename])
+            sample_idx = np.random.randint(traj_len-1)
+            return {
+                "observations": self.prior_data[filename]["observations"][sample_idx: sample_idx+2].copy(),
+                "actions": (self.prior_data[filename]["actions"][sample_idx: sample_idx+2]).copy(),
+                "rewards": self.prior_data[filename]["rewards"][sample_idx: sample_idx+2].copy(),
+                "dones": self.prior_data[filename]["dones"][sample_idx: sample_idx+2].copy(),
+                "seed": self.prior_data[filename]["seed"][sample_idx: sample_idx+2].copy(),
+            }
 
     def get_traj_len(self, traj_data: Dict) -> int:
         '''Get length of trajectory given the dictionary of trajectory data
