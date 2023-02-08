@@ -343,3 +343,4 @@ if __name__ == "__main__":
     for action, obj in scene.prompt():
         print(f"action: {action}, object: {obj}")
         # time.sleep(1)
+

@@ -283,3 +283,4 @@ def encode_prompts(f):
 
 if __name__ == "__main__":
     process_data("/home/jullian-yapeter/data/jaco/pick_apple", "/home/jullian-yapeter/data/jaco")
+
