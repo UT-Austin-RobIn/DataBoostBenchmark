@@ -408,8 +408,7 @@ class DataBoostDataset(Dataset):
         if type(dataset_dir) in (list, tuple):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
-                cur_file_paths = find_h5(cur_dataset_dir)
-                file_paths += cur_file_paths
+                file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
         if self.seq_len is None:
