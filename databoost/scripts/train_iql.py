@@ -223,7 +223,7 @@ if __name__ == "__main__":
     os.makedirs(dest_dir, exist_ok=True)
     benchmark = databoost.get_benchmark(**benchmark_configs)
     env = benchmark.get_env(task_name)
-    dataloader = env._get_dataloader(**dataloader_configs)
+    dataloader = env.get_combined_dataloader(**dataloader_configs)
 
     iql_policy = IQLModel(**policy_configs)
     policy = train(iql_policy=iql_policy,

@@ -73,13 +73,8 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         }
         env = language_table.LanguageTable(
             block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
-<<<<<<< HEAD
-            reward_factory=separate_blocks.SeparateBlocksReward,
-            # seed=0
-=======
             reward_factory=task_reward_dict[task_name],
             seed=0
->>>>>>> main
         )
         env = DataBoostEnvWrapper(
                 env,

@@ -1,20 +1,14 @@
 """Torch implementation of Implicit Q-Learning (IQL)
 https://github.com/ikostrikov/implicit_q_learning
 """
-import abc
-import pickle
 from collections import OrderedDict
-from typing import Iterable
 
 import numpy as np
 import torch
 import torch.optim as optim
 from torch import nn as nn
 import databoost.models.iql.pytorch_utils as ptu
-# from rlkit.core.eval_util import create_stats_ordered_dict
-# from rlkit.core.logging import add_prefix
-import torch.nn.functional as F
-import time
+
 
 class LinearTransform(nn.Module):
     def __init__(self, m, b):
@@ -148,7 +142,6 @@ class IQLModel(nn.Module):
         Policy and Alpha Loss
         """
         dist = self.policy(obs)
-        # dist, _  = self.policy(obs)
 
         """
         QF Loss
@@ -305,6 +298,4 @@ class IQLModel(nn.Module):
     
     def get_action(self, obs):
         act = self.policy(torch.tensor(obs).float().to('cuda')).mu.cpu().detach().numpy()
-        # act = self.policy.get_action(obs)
-        return act#*0.03
-        
+        return act
