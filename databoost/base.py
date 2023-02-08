@@ -17,10 +17,9 @@ from tqdm import tqdm
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
     find_pkl,
-    find_h5, read_h5, write_h5,
+    find_h5, read_h5, write_h5, read_json,
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
-
 
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
@@ -412,7 +411,6 @@ class DataBoostDataset(Dataset):
                 file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
-
         if self.seq_len is None:
             if n_demos is None:
                 n_demos = len(file_paths)
@@ -447,6 +445,9 @@ class DataBoostDataset(Dataset):
         print("filtering files of sufficient length")
         for file_path in tqdm(file_paths):
             traj_data = read_h5(file_path, load_imgs=load_imgs)
+            if postproc_func is not None:
+                traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
+                    postproc_func(traj_data.get("observations"), traj_data.get("rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
                 if postproc_func is not None:
@@ -494,7 +495,7 @@ class DataBoostDataset(Dataset):
                 max_goal_idxs = [
                     min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
                 min_goal_idxs = [
-                    max(max_goal_idx - 10, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
+                    max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
                 self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
 

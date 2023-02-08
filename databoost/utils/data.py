@@ -220,10 +220,8 @@ def get_traj_slice(traj_data: Dict,
     return traj_seq
 
 
-def dump_video_wandb(vid, tag, entity=None, project=None, fps=20):
+def dump_video_wandb(vid, tag, fps=20):
     assert len(vid.shape) == 4 and vid.shape[1] == 3
     if vid.max() <= 1.0:
         vid = np.asarray(vid * 255.0, dtype=np.uint8)
-    if entity is not None and project is not None:
-        init_wandb(entity, project)
     wandb.log({tag: [wandb.Video(vid, fps=fps, format="mp4")]})

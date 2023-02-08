@@ -152,7 +152,6 @@ for ep in tqdm(range(n_epochs)):
                 filename = os.path.join(
                     root, f"{ep}/{task}/{traj_id}/{task}_{ep}_{traj_id}_{step}.pkl")
                 traj = read_pkl(filename)
-                # import pdb; pdb.set_trace()
                 traj["env_infos"].pop("task_name")
                 done = (traj["step_types"] in (2, 3)) or (
                     step == n_steps_per_ep-1)

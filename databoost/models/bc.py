@@ -110,6 +110,7 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
             })
         }),
         self.num_hidden_layers = len(hidden_sizes)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         super().__init__(hidden_sizes=hidden_sizes, env_spec=env_spec, *args, **kwargs)
 
     def forward(self, obs):
@@ -120,7 +121,6 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
              pred_act_dist,
              action_batch):
         '''Compute the mean negative log likelihood loss of the batch of actions.
-
         Args:
             pred_act_dist [databoost.utils.model_utils.MultivariateGaussian]:
                 multivariate gaussian distribution(s) of predicted action
@@ -128,23 +128,25 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
         Returns:
             loss [torch.float]: mean negative log likelihood of batch
         '''
+        if self.act_range is not None:
+            action_batch /= self.act_range
         log_prob = pred_act_dist.log_prob(action_batch)
         loss = -1 * log_prob.mean()
         return loss
 
     def get_action(self, ob):
         '''Get action from the policy given an observation.
-
         Args:
             ob [np.ndarray]: an observation from the environment
         Returns:
             act [np.ndarray]: an action from the policy
         '''
         with torch.no_grad():
-            ob = torch.tensor(ob[None], dtype=torch.float).to(
-                torch.device("cuda"))
+            ob = torch.tensor(ob[None], dtype=torch.float).to(self.device)
             dist = self._module(ob)
             act = dist.mean.cpu().detach().numpy()[0]
+            if self.act_range is not None:
+                act *= self.act_range
             return act
 
     def embed(self, obs):

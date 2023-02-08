@@ -102,8 +102,8 @@ if __name__ == "__main__":
 
     wandb_config = {
         "project": "boost",
-        "dir": "/home/jullian-yapeter/tmp",
-        "entity": "clvr",
+        "dir": "/tmp",
+        "entity": "sample_lab",
         "notes": "",
     }
 
