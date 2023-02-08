@@ -197,26 +197,27 @@ def get_traj_slice(traj_data: Dict,
         traj_data [Dict]: the dictionary of trajectory data to be sliced
         traj_len [int]: the length (steps) of the given trajectory data
         slice_start_idx [int]: the starting index of the subsequence to be
-                               returned
+                                returned
         slice_end_idx [int]: 1 + the ending index of the subsequence to be
-                             returned
+                                returned
     '''
     seq_len = slice_end_idx - slice_start_idx
     traj_seq = {}
     for attr in traj_data:
         if isinstance(traj_data[attr], dict):
             # if it's a nested dictionary, recursively call this slice function
-            traj_seq[attr] = get_traj_slice(
-                traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
-        elif isinstance(traj_data[attr], (torch.Tensor, np.ndarray)) and traj_data[attr].shape[0] == traj_len:
-            traj_seq[attr] = copy.deepcopy(
-                traj_data[attr][slice_start_idx: slice_end_idx])
+            traj_seq[attr] = get_traj_slice(traj_data[attr], traj_len, slice_start_idx, slice_end_idx)
+        elif isinstance(traj_data[attr], np.ndarray) and traj_data[attr].shape[0] == traj_len:
+            traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].copy()
+            # assert that each attribute will have shape (seq_len, *attribute shape)
+            assert len(traj_seq[attr]) == seq_len
+        elif isinstance(traj_data[attr], torch.Tensor) and traj_data[attr].shape[0] == traj_len:
+            traj_seq[attr] = traj_data[attr][slice_start_idx: slice_end_idx].clone()
             # assert that each attribute will have shape (seq_len, *attribute shape)
             assert len(traj_seq[attr]) == seq_len
         else:
             # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
-            traj_seq[attr] = copy.deepcopy(
-                [traj_data[attr] for _ in range(seq_len)])
+            traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
     return traj_seq
 
 
