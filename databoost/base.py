@@ -21,10 +21,6 @@ from databoost.utils.data import (
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
-no_target = False
-only_target = False
-
-
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
     capability to gym environments.
@@ -413,9 +409,6 @@ class DataBoostDataset(Dataset):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
                 cur_file_paths = find_h5(cur_dataset_dir)
-                if no_target and "metaworld" in dataset_dir:
-                    if "seed" not in dataset_dir:
-                        cur_file_paths = [fp for fp in cur_file_paths if "pick-place-wall" not in fp]
                 file_paths += cur_file_paths
         else:
             file_paths = find_h5(dataset_dir)
@@ -503,7 +496,7 @@ class DataBoostDataset(Dataset):
                 max_goal_idxs = [
                     min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
                 min_goal_idxs = [
-                    max(max_goal_idx - 10, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
+                    max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
                 self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
 
