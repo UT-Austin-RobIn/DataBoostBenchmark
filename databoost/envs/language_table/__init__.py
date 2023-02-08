@@ -14,7 +14,12 @@ from databoost.base import DataBoostEnvWrapper, DataBoostBenchmarkBase
 from databoost.utils.general import AttrDict
 from language_table.environments import blocks
 from language_table.environments import language_table
-from language_table.environments.rewards import block2block, separate_blocks
+from language_table.environments.rewards import (
+    block2block, separate_blocks, block1_to_corner,
+    block2absolutelocation, point2block, block2block_relative_location,
+    block2relativelocation
+)
+
 from r3m import load_r3m
 
 
@@ -57,9 +62,19 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
 
             return obs, reward, done, info
 
+        task_reward_dict = {
+            "separate": separate_blocks.SeparateBlocksReward,
+            "block2block": block2block.BlockToBlockReward,
+            "block1_to_corner": block1_to_corner.Block1ToCornerLocationReward,
+            "block2absolutelocation": block2absolutelocation.BlockToAbsoluteLocationReward,
+            "point2block": point2block.PointToBlockReward,
+            "block2block_relative_location": block2block_relative_location.BlockToBlockRelativeLocationReward,
+            "block2relativelocation": block2relativelocation.BlockToRelativeLocationReward
+        }
         env = language_table.LanguageTable(
             block_mode=blocks.LanguageTableBlockVariants.BLOCK_8,
-            reward_factory=separate_blocks.SeparateBlocksReward,
+            # reward_factory=separate_blocks.SeparateBlocksReward,
+            reward_factory=task_reward_dict[task_name],
             seed=0
         )
         env = DataBoostEnvWrapper(

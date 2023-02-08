@@ -19,7 +19,7 @@ from databoost.utils.data import (
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
-no_target = False
+no_target = True
 only_target = False
 
 
@@ -321,6 +321,7 @@ class DataBoostBenchmarkBase:
                     pad = [last_frame for _ in range(max_traj_len - len(gif))]
                     gif += pad
                 gifs.append(np.stack(gif))
+            # print(f"successes: {n_successes}")
         success_rate = n_successes / n_episodes
         if render: gifs = np.concatenate(gifs, axis=-1)
         return (success_rate, gifs)
@@ -375,15 +376,38 @@ class DataBoostDataset(Dataset):
             file_paths = []
             for cur_dataset_dir in dataset_dir:
                 cur_file_paths = find_h5(cur_dataset_dir)
-                if no_target and "metaworld" in dataset_dir:
-                    if "seed" not in dataset_dir:
+                print(f"before: {len(cur_file_paths)}")
+                if no_target and "metaworld" in cur_dataset_dir:
+                    if "seed" not in cur_dataset_dir:
                         cur_file_paths = [fp for fp in cur_file_paths if "pick-place-wall" not in fp]
+                print(f"after: {len(cur_file_paths)}")
                 file_paths += cur_file_paths
         else:
             file_paths = find_h5(dataset_dir)
             if no_target and "metaworld" in dataset_dir:
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
+
+        if no_target:
+            for fp in file_paths:
+                if "seed" not in fp:
+                    assert "pick-place-wall" not in fp
+
+        #### Hand curation
+        accept_list = ("push-back", "pick-place", "hand-insert", "push")
+        print(f"Curating Dataset from original {len(file_paths)}")
+        print(f"Using acceptance list: {accept_list}")
+        def hand_curate(fp):
+            if "seed" in fp:
+                return True
+            for task in accept_list:
+                if task in fp:
+                    return True
+            return False
+        file_paths = [fp for fp in file_paths if hand_curate(fp)]
+        print(f"num seed files: {len([fp for fp in file_paths if 'pick-place-wall' in fp])}")
+        print(f"Curated to {len(file_paths)}")
+        ####
 
         print(f"found {len(file_paths)} files")
         #file_paths = file_paths[:1000]

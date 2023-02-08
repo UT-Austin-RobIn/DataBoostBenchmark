@@ -9,6 +9,7 @@ import tensorflow_datasets as tfds
 from typing import Dict
 from databoost.utils.general import AttrDict
 from databoost.utils.data import write_h5
+from r3m import load_r3m
 import clip
 from torchvision.transforms import ToPILImage
 
@@ -39,6 +40,9 @@ class DatasetSaver:
         self.clip_model, self.clip_preprocess = clip.load('ViT-B/32', self.device)
         self.clip_model.eval()
         self.clip_model.to(self.device)
+        self.r3m = load_r3m("resnet50")  # resnet18, resnet34
+        self.r3m.eval()
+        self.r3m.to(self.device)
 
     def init_traj(self) -> Dict:
         '''Initialize an empty trajectory, preparing for data collection
@@ -112,7 +116,7 @@ class DatasetSaver:
         # make dataset
         dataset_path = os.path.join(self._dataset_directories[dataset_name], '0.0.1')
         builder = tfds.builder_from_directory(dataset_path)
-        episode_ds = builder.as_dataset(split='train[:50%]')
+        episode_ds = builder.as_dataset(split='train[65%:80%]')
 
         # choose data size
         if n_episodes < 0:
@@ -127,37 +131,40 @@ class DatasetSaver:
         os.makedirs(dest_dir, exist_ok=True)
 
         # iterate over data and save to H5
-        for i, episode in tqdm.tqdm(enumerate(it)):
+        for i, episode in tqdm.tqdm(enumerate(it), total=int(n_total)):
             traj = self.init_traj()
             for step in episode['steps']:
-                ob = tf.concat((step['observation']['effector_translation'],
-                                step['observation']['effector_target_translation']), axis=0)
+                # ob = tf.concat((step['observation']['effector_translation'],
+                #                 step['observation']['effector_target_translation']), axis=0)
                 act = step['action']
                 rew = step['reward']
                 done = step['is_last'] or step['is_terminal']
                 info = AttrDict(instruction=step['observation']['instruction'])
-                im = np.transpose(step['observation']['rgb'], (2, 0, 1))
-                # import pdb; pdb.set_trace()
-                im = self.clip_preprocess(self.to_pil_transform(im)).numpy()
+                im = step['observation']['rgb']
                 if mask_reward: rew = 0.0
 
                 self.add_to_traj(traj, im, act, rew, done, info)
 
             # move trajectory data to numpy
             traj = self.traj_to_numpy(traj)
+            
+            
+            # encode images with CLIP
             # import pdb; pdb.set_trace()
-            traj.observations = self.clip_model.encode_image(torch.from_numpy(traj.observations).to(self.device)).data.cpu().numpy()
+            imgs = tf.stack(traj.observations).numpy().transpose(0, 3, 1, 2)
+            clip_tokenized_imgs = torch.stack([self.clip_preprocess(self.to_pil_transform(im)) for im in imgs])
+            clip_encs = self.clip_model.encode_image(clip_tokenized_imgs.to(self.device)).data.cpu().numpy()
 
             # # encode images with R3M
-            # imgs = torch.from_numpy(tf.stack(traj.imgs).numpy().transpose(0, 3, 1, 2)).to(self.device)
-            # imgs = torchvision.transforms.Resize((224, 224))(imgs)
-            # encs = self.r3m(imgs).data.cpu().numpy()  # [seq_len, 2048]
+            imgs = torch.from_numpy(imgs).to(self.device)
+            imgs = torchvision.transforms.Resize((224, 224))(imgs)
+            r3m_encs = self.r3m(imgs).data.cpu().numpy()  # [seq_len, 2048]
 
-            
-            
+            encs = np.concatenate((clip_encs, r3m_encs), axis=-1)
+
             # # overwrite obs with R3M encoding, remove images
             # traj.pop('imgs')
-            # traj.observations = encs
+            traj.observations = encs
 
             filename = f"episode_{i}"
             traj["dones"][-1] = True
@@ -167,6 +174,6 @@ class DatasetSaver:
 if __name__ == "__main__":
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
-        dest_dir='/data/jullian-yapeter/lang_table/batch1',
+        dest_dir='/data/jullian-yapeter/lang_table/batch3',
         #n_episodes=1000,
     )

@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 total_len = 0
-file_paths = find_h5("/data/karl/data/language_table/rl_episodes")
+file_paths = find_h5("/home/jullian-yapeter/data/boosted_data/metaworld/pick-place-wall/NoTarget-All")
 # file_paths += find_h5("/data/karl/data/language_table/rl_episodes")
 for file_path in tqdm(file_paths):
     curr_len = len(read_h5(file_path).actions)
