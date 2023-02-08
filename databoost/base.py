@@ -361,6 +361,7 @@ class DataBoostBenchmarkBase:
         success_rate = n_successes / n_episodes
         if render:
             gifs = np.concatenate(gifs, axis=-1)
+        print(f"{n_successes}/{n_episodes} success rate")
         return (success_rate, gifs)
 
 
