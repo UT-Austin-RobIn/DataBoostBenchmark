@@ -1,9 +1,11 @@
-import os
-import numpy as np
-from databoost.utils.data import find_pkl, read_pkl, write_h5
-from databoost.utils.general import AttrDict
 from typing import Dict
 from tqdm import tqdm
+
+import os
+import numpy as np
+
+from databoost.utils.data import read_pkl, write_h5
+from databoost.utils.general import AttrDict
 
 
 n_epochs = 51
@@ -73,8 +75,9 @@ traj_keys = [
     "imgs"
 ]
 
-root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v4"
-dest_root = "/data/jullian-yapeter/DataBoostBenchmark/metaworld_rl_v4_h5"
+root = "/data/metaworld_rl_v3"
+dest_root = "/data/metaworld_rl_v3_h5"
+
 
 def init_traj():
     '''Initialize an empty trajectory, preparing for data collection
@@ -87,14 +90,15 @@ def init_traj():
         traj[attr] = [] if attr not in ("info", "infos") else {}
     return traj
 
+
 def add_to_traj(
-    traj: AttrDict,
-    ob: np.ndarray,
-    act: np.ndarray,
-    rew: float,
-    done: bool,
-    info: Dict,
-    im: np.ndarray = None):
+        traj: AttrDict,
+        ob: np.ndarray,
+        act: np.ndarray,
+        rew: float,
+        done: bool,
+        info: Dict,
+        im: np.ndarray = None):
     '''helper function to append a step's results to a trajectory dictionary
 
     Args:
@@ -118,6 +122,7 @@ def add_to_traj(
     if im is not None:
         traj.imgs.append(im)
 
+
 def traj_to_numpy(traj: AttrDict) -> AttrDict:
     '''convert trajectories attributes into numpy arrays
 
@@ -132,7 +137,8 @@ def traj_to_numpy(traj: AttrDict) -> AttrDict:
             traj_numpy[attr] = np.array(traj[attr]).squeeze()
         else:
             for info_attr in traj.infos:
-                traj_numpy.infos[info_attr] = np.array(traj.infos[info_attr]).squeeze()
+                traj_numpy.infos[info_attr] = np.array(
+                    traj.infos[info_attr]).squeeze()
     return traj_numpy
 
 
@@ -143,11 +149,13 @@ for ep in tqdm(range(n_epochs)):
             traj_h5 = init_traj()
             path_num = 0
             for step in tqdm(range(n_steps_per_ep)):
-                filename = os.path.join(root, f"{ep}/{task}/{traj_id}/{task}_{ep}_{traj_id}_{step}.pkl")
+                filename = os.path.join(
+                    root, f"{ep}/{task}/{traj_id}/{task}_{ep}_{traj_id}_{step}.pkl")
                 traj = read_pkl(filename)
                 # import pdb; pdb.set_trace()
                 traj["env_infos"].pop("task_name")
-                done = (traj["step_types"] in (2, 3)) or (step == n_steps_per_ep-1)
+                done = (traj["step_types"] in (2, 3)) or (
+                    step == n_steps_per_ep-1)
                 add_to_traj(
                     traj_h5,
                     traj["observations"][0][:39],
@@ -162,7 +170,8 @@ for ep in tqdm(range(n_epochs)):
                     if task not in made_tasks:
                         os.makedirs(dest_dir, exist_ok=True)
                         made_tasks.add(task)
-                    dest_path = os.path.join(dest_dir, f"{task}_{ep}_{traj_id}_{path_num}.h5")
+                    dest_path = os.path.join(
+                        dest_dir, f"{task}_{ep}_{traj_id}_{path_num}.h5")
                     write_h5(traj_h5, dest_path)
                     traj_h5 = init_traj()
                     path_num += 1

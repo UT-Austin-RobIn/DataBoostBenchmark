@@ -1,6 +1,5 @@
 import copy
 
-import cv2
 import numpy as np
 import torch
 
@@ -69,69 +68,54 @@ class DatasetGeneratorMetaworld(DatasetGeneratorBase):
         })
         done = info['success']
         return ob, rew, done, info
-    
+
     def get_env_state(self, env):
         return get_env_state(env)
 
 
 if __name__ == "__main__":
-    import random
 
-    random.seed(83)
-    np.random.seed(83)
     '''generate seed dataset'''
-    seed_dataset_generator = DatasetGeneratorMetaworld(**cfg.seed_dataset_kwargs)
+    seed_dataset_generator = DatasetGeneratorMetaworld(
+        **cfg.seed_dataset_kwargs)
     seed_dataset_generator.generate_dataset(
-        tasks = {
+        tasks={
             task_name: task_config for task_name, task_config in cfg.tasks.items()
             if task_name in cfg.seed_tasks_list
         },
-        dest_dir = cfg.seed_dataset_dir,
-        n_demos_per_task = cfg.seed_n_demos,
-        do_render = cfg.seed_do_render,
-        save_env_and_goal = cfg.seed_save_env_and_goal,
-        mask_reward = False
+        dest_dir=cfg.seed_dataset_dir,
+        n_demos_per_task=cfg.seed_n_demos,
+        do_render=cfg.seed_do_render,
+        save_env_and_goal=cfg.seed_save_env_and_goal,
+        mask_reward=False
     )
 
-    # '''generate prior dataset'''
-    # prior_dataset_generator = DatasetGeneratorMetaworld(**cfg.prior_dataset_kwargs)
-    # prior_dataset_generator.generate_dataset(
-    #     tasks = {
-    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
-    #         if task_name in cfg.prior_tasks_list
-    #     },
-    #     dest_dir = cfg.prior_dataset_dir,
-    #     n_demos_per_task = cfg.prior_n_demos,
-    #     do_render = cfg.prior_do_render,
-    #     save_env_and_goal = cfg.prior_save_env_and_goal,
-    #     mask_reward = True
-    # )
+    '''generate prior dataset'''
+    prior_dataset_generator = DatasetGeneratorMetaworld(
+        **cfg.prior_dataset_kwargs)
+    prior_dataset_generator.generate_dataset(
+        tasks={
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.prior_tasks_list
+        },
+        dest_dir=cfg.prior_dataset_dir,
+        n_demos_per_task=cfg.prior_n_demos,
+        do_render=cfg.prior_do_render,
+        save_env_and_goal=cfg.prior_save_env_and_goal,
+        mask_reward=True
+    )
 
-    # '''generate test dataset'''
-    # test_dataset_generator = DatasetGeneratorMetaworld(**cfg.test_dataset_kwargs)
-    # test_dataset_generator.generate_dataset(
-    #     tasks = {
-    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
-    #         if task_name in cfg.test_tasks_list
-    #     },
-    #     dest_dir = cfg.test_dataset_dir,
-    #     n_demos_per_task = cfg.test_n_demos,
-    #     do_render = cfg.test_do_render,
-    #     save_env_and_goal = cfg.test_save_env_and_goal,
-    #     mask_reward = False
-    # )
-
-
-    # '''generate val dataset'''
-    # val_dataset_generator = DatasetGeneratorMetaworld(**cfg.val_dataset_kwargs)
-    # val_dataset_generator.generate_dataset(
-    #     tasks = {
-    #         task_name: task_config for task_name, task_config in cfg.tasks.items()
-    #         if task_name in cfg.val_tasks_list
-    #     },
-    #     dest_dir = cfg.val_dataset_dir,
-    #     n_demos_per_task = cfg.val_n_demos,
-    #     do_render = cfg.val_do_render,
-    #     save_env_and_goal = cfg.val_save_env_and_goal,
-    #     mask_reward = False
-    # )
+    '''generate test dataset'''
+    test_dataset_generator = DatasetGeneratorMetaworld(
+        **cfg.test_dataset_kwargs)
+    test_dataset_generator.generate_dataset(
+        tasks={
+            task_name: task_config for task_name, task_config in cfg.tasks.items()
+            if task_name in cfg.test_tasks_list
+        },
+        dest_dir=cfg.test_dataset_dir,
+        n_demos_per_task=cfg.test_n_demos,
+        do_render=cfg.test_do_render,
+        save_env_and_goal=cfg.test_save_env_and_goal,
+        mask_reward=False
+    )
