@@ -13,7 +13,7 @@ def initialize_env(env: MujocoEnv) -> MujocoEnv:
     Returns:
         env [MujocoEnv]: env with attributes prepared for online use
     '''
-    env._partially_observable = False
+    env._partially_observable = True
     env._freeze_rand_vec = False
     env._set_task_called = True
     env.reset()

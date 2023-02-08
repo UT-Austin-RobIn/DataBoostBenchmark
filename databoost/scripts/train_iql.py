@@ -14,6 +14,10 @@ from databoost.models.iql.policies import GaussianPolicy, ConcatMlp
 from databoost.models.iql.iql import IQLModel
 
 
+def map_dict(fn, d):
+    """takes a dictionary and applies the function to every element"""
+    return type(d)(map(lambda kv: (kv[0], fn(kv[1])), d.items()))
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def train(iql_policy,
           dataloader: DataLoader,

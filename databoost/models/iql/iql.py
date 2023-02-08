@@ -9,7 +9,6 @@ import torch.optim as optim
 from torch import nn as nn
 import databoost.models.iql.pytorch_utils as ptu
 
-
 class LinearTransform(nn.Module):
     def __init__(self, m, b):
         super().__init__()
@@ -175,7 +174,6 @@ class IQLModel(nn.Module):
 
         adv = q_pred - vf_pred
         exp_adv = torch.exp(adv * self.beta)
-        # exp_adv = torch.ones_like(q_pred)
         if self.clip_score is not None:
             exp_adv = torch.clamp(exp_adv, max=self.clip_score)
 

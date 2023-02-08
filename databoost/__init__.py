@@ -1,3 +1,4 @@
+# TODO: Maybe only import the specific environment when required
 from databoost.base import DataBoostBenchmarkBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
 from databoost.envs.language_table import DataBoostBenchmarkLanguageTable
