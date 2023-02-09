@@ -9,7 +9,7 @@ from databoost.models.iql.iql import IQLModel
 
 exp_name = "iql-og-again"
 boosting_method = "demo"
-policy_filename = f"/data/sdass/DataBoostBenchmark/language_table/models/dummy/separate/{boosting_method}/{exp_name}/language_table-separate-{boosting_method}-{exp_name}"
+policy_filename = f"CurateDataset/language_table/models/dummy/separate/{boosting_method}/{exp_name}/language_table-separate-{boosting_method}-{exp_name}"
 
 benchmark = "language_table"
 task = "separate"

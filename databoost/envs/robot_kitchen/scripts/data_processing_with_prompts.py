@@ -282,5 +282,5 @@ def encode_prompts(f):
     f["prompt_embeddings"] = np.stack(language_embeddings)
 
 if __name__ == "__main__":
-    process_data("/home/jullian-yapeter/data/jaco/pick_apple", "/home/jullian-yapeter/data/jaco")
+    process_data("CurateDataset/jaco/pick_apple", "CurateDataset/data/jaco")
 

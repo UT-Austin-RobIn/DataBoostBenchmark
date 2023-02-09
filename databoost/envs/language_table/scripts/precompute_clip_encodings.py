@@ -6,7 +6,7 @@ import os
 import tqdm
 
 
-DATA_DIR = "/data/karl/data/table_sim/prior_data"
+DATA_DIR = "CurateDataset/data/table_sim/prior_data"
 SUFFIX = "_clip"
 
 
