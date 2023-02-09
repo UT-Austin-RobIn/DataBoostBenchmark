@@ -9,15 +9,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import (
-    Dataset, DataLoader, LTD_CACHE_MAX,
-    GOAL_DIST, GOAL_WINDOW
+    Dataset, DataLoader
 )
 from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
 from databoost.utils.data import (
     find_pkl, find_h5, read_h5, write_h5,
-    get_start_end_idxs, concatenate_traj_data, get_traj_slice
+    get_start_end_idxs, concatenate_traj_data, get_traj_slice,
+    LTD_CACHE_MAX, GOAL_DIST, GOAL_WINDOW
 )
 
 
@@ -324,7 +324,7 @@ class DataBoostBenchmarkBase:
         '''
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
-        policy = policy.detach().clone().eval().to(device)
+        policy = copy.deepcopy(policy).eval().to(device)
         n_successes = 0
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):

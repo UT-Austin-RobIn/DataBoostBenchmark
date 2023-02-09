@@ -17,7 +17,7 @@ class DataBoostBenchmarkMetaworld(DataBoostBenchmarkBase):
         Attributes:
             tasks_list [List]: the list of tasks compatible with this benchmark
         '''
-        self.tasks_list = list(cfg.tasks.keys())
+        self.tasks_list = list(cfg.seed_tasks_list)
         if mask_goal_pos:
             def mask_goal_func(obs, reward, done, info):
                 if len(obs.shape) == 1:

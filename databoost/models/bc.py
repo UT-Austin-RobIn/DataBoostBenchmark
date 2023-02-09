@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from databoost.utils.general import AttrDict
+# from databoost.utils.general import AttrDict
 from databoost.utils.model_utils import MultivariateGaussian
 from garage.torch.policies import TanhGaussianMLPPolicy
 
@@ -100,22 +100,18 @@ class BCPolicy(nn.Module):
 
 
 class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
-    def __init__(self, obs_dim, act_dim, hidden_sizes=None, *args, **kwargs):
-        env_spec = AttrDict({
-            "observation_space": AttrDict({
-                "flat_dim": obs_dim
-            }),
-            "action_space": AttrDict({
-                "flat_dim": act_dim
-            })
-        }),
+    def __init__(self, obs_dim, act_dim, act_range=1.0, hidden_sizes=None, *args, **kwargs):
+        # env_spec = AttrDict({
+        #     "observation_space": AttrDict({
+        #         "flat_dim": 3
+        #     }),
+        #     "action_space": AttrDict({
+        #         "flat_dim": 2
+        #     })
+        # }),
+        self.act_range = act_range
         self.num_hidden_layers = len(hidden_sizes)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        super().__init__(hidden_sizes=hidden_sizes, env_spec=env_spec, *args, **kwargs)
-
-    def forward(self, obs):
-        dist, _ = super().forward(obs)
-        return dist
+        super().__init__(env_spec, hidden_sizes=hidden_sizes, *args, **kwargs)
 
     def loss(self,
              pred_act_dist,
@@ -128,7 +124,8 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
         Returns:
             loss [torch.float]: mean negative log likelihood of batch
         '''
-        if self.act_range is not None:
+        # [HOTFIX]
+        if hasattr(self, "act_range") and self.act_range is not None:
             action_batch /= self.act_range
         log_prob = pred_act_dist.log_prob(action_batch)
         loss = -1 * log_prob.mean()
@@ -142,10 +139,11 @@ class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):
             act [np.ndarray]: an action from the policy
         '''
         with torch.no_grad():
-            ob = torch.tensor(ob[None], dtype=torch.float).to(self.device)
+            ob = torch.tensor(ob[None], dtype=torch.float).to(torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
             dist = self._module(ob)
             act = dist.mean.cpu().detach().numpy()[0]
-            if self.act_range is not None:
+            # [HOTFIX]
+            if hasattr(self, "act_range") and self.act_range is not None:
                 act *= self.act_range
             return act
 

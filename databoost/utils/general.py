@@ -15,3 +15,17 @@ class AttrDict(dict):
 
     def __setstate__(self, dictionary):
         self = dictionary
+
+
+def print_traj_shapes(traj_batch, prefix=None):
+    for attr, val in traj_batch.items():
+        if (isinstance(val, dict)):
+            if prefix is None:
+                print_traj_shapes(val, attr)
+            else:
+                print_traj_shapes(val, f"{prefix}/{attr}")
+            continue
+        if prefix is None:
+            print(f"{attr} [{type(val)}]: {val.shape}")
+        else:
+            print(f"{prefix}/{attr} [{type(val)}]: {val.shape}")

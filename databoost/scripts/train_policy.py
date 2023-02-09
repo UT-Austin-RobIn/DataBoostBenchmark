@@ -6,10 +6,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import wandb
+# import wandb
 
 from databoost.base import DataBoostBenchmarkBase
-from databoost.utils.data import dump_video_wandb
+from databoost.utils.general import AttrDict
+# from databoost.utils.data import dump_video_wandb
 
 
 def train(policy: nn.Module,
@@ -43,7 +44,7 @@ def train(policy: nn.Module,
             obs_batch = traj_batch["observations"].to(device)
             # remove the window dimension, since just 1
             obs_batch = obs_batch[:, 0, :]
-            pred_action_dist = policy(obs_batch.float())
+            pred_action_dist, _ = policy(obs_batch.float())
             action_batch = traj_batch["actions"].to(device)
             # remove the window dimension, since just 1
             action_batch = action_batch[:, 0, :]
@@ -58,8 +59,8 @@ def train(policy: nn.Module,
                     dest_dir, f"{exp_name}-{step}.pt"))
             if (step % eval_period) == 0:
                 if eval_episodes <= 0 or eval_max_traj_len <= 0:
-                    wandb.log({"step": step, "epoch": epoch,
-                              "loss": np.mean(losses)})
+                    # wandb.log({"step": step, "epoch": epoch,
+                    #           "loss": np.mean(losses)})
                     print(
                         f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}")
                     continue
@@ -72,8 +73,8 @@ def train(policy: nn.Module,
                     max_traj_len=eval_max_traj_len,
                     goal_cond=goal_condition
                 )
-                wandb.log({"step": step, "epoch": epoch, "loss": np.mean(
-                    losses), "success_rate": success_rate})
+                # wandb.log({"step": step, "epoch": epoch, "loss": np.mean(
+                #     losses), "success_rate": success_rate})
                 print(
                     f"step {step}, epoch {epoch}: loss = {np.mean(losses):.3f}, success_rate = {success_rate}")
                 if success_rate >= best_success_rate:
@@ -94,18 +95,18 @@ if __name__ == "__main__":
     '''Set training configuration'''
     benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    experiment_method = "R3M"
+    experiment_method = "demo"
     policy_class = TanhGaussianBCPolicy
     goal_condition = True
     exp_name = f"{benchmark_name}-{task_name}-{experiment_method}"
     dest_dir = f"trained_models/{benchmark_name}/{task_name}/{experiment_method}"
 
-    wandb_config = {
-        "project": "boost",
-        "dir": "/tmp",
-        "entity": "sample_lab",
-        "notes": "",
-    }
+    # wandb_config = {
+    #     "project": "boost",
+    #     "dir": "/tmp",
+    #     "entity": "sample_lab",
+    #     "notes": "",
+    # }
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -120,8 +121,16 @@ if __name__ == "__main__":
     }
 
     policy_configs = {
-        "obs_dim": 39 * (2 if goal_condition else 1),
-        "act_dim": 4,
+        "env_spec": AttrDict({
+            "observation_space": AttrDict({
+                "flat_dim": 39 * (2 if goal_condition else 1),
+            }),
+            "action_space": AttrDict({
+                "flat_dim": 4
+            })
+        }),
+        # "obs_dim": 39 * (2 if goal_condition else 1),
+        # "act_dim": 4,
         "hidden_sizes": [400, 400, 400],
         "hidden_nonlinearity": nn.ReLU,
         "output_nonlinearity": None,
@@ -134,17 +143,17 @@ if __name__ == "__main__":
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 1e3,
-        "eval_episodes": 20,
+        "eval_period": 500,
+        "eval_episodes": 10,
         "eval_max_traj_len": 500,
-        "chkpt_save_period": 5e3,
-        "n_steps": 2e5,
+        "chkpt_save_period": 500,
+        "n_steps": 1000,
         "goal_condition": goal_condition
     }
 
     eval_configs = {
         "task_name": task_name,
-        "n_episodes": 300,
+        "n_episodes": 20,
         "max_traj_len": 500,
         "goal_cond": goal_condition,
     }
@@ -165,11 +174,11 @@ if __name__ == "__main__":
         "rollout_configs": rollout_configs
     }
 
-    wandb.init(
-        resume=exp_name,
-        config=configs,
-        **wandb_config
-    )
+    # wandb.init(
+    #     resume=exp_name,
+    #     config=configs,
+    #     **wandb_config
+    # )
 
     '''Build training setup and train'''
     os.makedirs(dest_dir, exist_ok=True)
@@ -192,7 +201,7 @@ if __name__ == "__main__":
         **eval_configs
     )
     print(f"final success_rate: {success_rate}")
-    wandb.log({"final_success_rate": success_rate})
+    # wandb.log({"final_success_rate": success_rate})
 
     '''Test the best performing checkpoint of the trained policy'''
     best_policy = torch.load(os.path.join(dest_dir, f"{exp_name}-best.pt"))
@@ -202,7 +211,7 @@ if __name__ == "__main__":
         **eval_configs
     )
     print(f"best success_rate: {success_rate}")
-    wandb.log({"best_success_rate": success_rate})
+    # wandb.log({"best_success_rate": success_rate})
 
     '''generate sample policy rollouts'''
     success_rate, gifs = benchmark.evaluate(
@@ -210,4 +219,4 @@ if __name__ == "__main__":
         render=True,
         **rollout_configs
     )
-    dump_video_wandb(gifs, "rollouts")
+    # dump_video_wandb(gifs, "rollouts")

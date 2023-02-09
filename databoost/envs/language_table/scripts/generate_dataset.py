@@ -159,6 +159,6 @@ class DatasetSaver:
 if __name__ == "__main__":
     DatasetSaver().generate_dataset(
         dataset_name='language_table_sim',
-        dest_dir='/data/karl/data/table_sim/prior_data/batch1',
+        dest_dir='CurateDataset/table_sim/prior_data/batch1',
         #n_episodes=1000,
     )

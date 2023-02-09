@@ -78,9 +78,9 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         )
         env = DataBoostEnvWrapper(
                 env,
-                seed_dataset_url="/data/karl/data/table_sim/prior_data",
-                prior_dataset_url="/data/karl/data/table_sim/prior_data",
-                test_dataset_url="/data/karl/data/table_sim/prior_data",
+                seed_dataset_url="CurateDataset/table_sim/prior_data",
+                prior_dataset_url="CurateDataset/table_sim/prior_data",
+                test_dataset_url="CurateDataset/table_sim/prior_data",
                 render_func=lambda x: x.render()[:, :, ::-1],
                 postproc_func=language_table_postproc,
             )

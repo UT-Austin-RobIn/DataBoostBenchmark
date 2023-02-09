@@ -7,7 +7,7 @@ from databoost.utils.general import AttrDict
 
 
 '''General configs'''
-env_root = "data_and_models/metaworld"
+env_root = "CurateDataset/metaworld"
 
 
 '''Tasks configs'''
@@ -15,302 +15,302 @@ tasks = {
     "pick-place-wall": AttrDict({
         "task_name": "pick-place-wall",
         "env": ALL_V2_ENVS["pick-place-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/pick-place-wall"),
         "test_dataset": os.path.join(env_root, "test/pick-place-wall"),
         "expert_policy": policies.SawyerPickPlaceWallV2Policy,
     }),
     "assembly": AttrDict({
         "task_name": "assembly",
         "env": ALL_V2_ENVS["assembly-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/assembly"),
+        "seed_dataset": os.path.join(env_root, "seed/assembly"),
         "expert_policy": policies.SawyerAssemblyV2Policy,
     }),
     "door-open": AttrDict({
         "task_name": "door-open",
         "env": ALL_V2_ENVS["door-open-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/door-open"),
+        "seed_dataset": os.path.join(env_root, "seed/door-open"),
         "expert_policy": policies.SawyerDoorOpenV2Policy,
     }),
     "plate-slide-back-side": AttrDict({
         "task_name": "plate-slide-back-side",
         "env": ALL_V2_ENVS["plate-slide-back-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back-side"),
+        "seed_dataset": os.path.join(env_root, "seed/plate-slide-back-side"),
         "expert_policy": policies.SawyerPlateSlideBackSideV2Policy,
     }),
     "plate-slide-side": AttrDict({
         "task_name": "plate-slide-side",
         "env": ALL_V2_ENVS["plate-slide-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-side"),
+        "seed_dataset": os.path.join(env_root, "seed/plate-slide-side"),
         "expert_policy": policies.SawyerPlateSlideSideV2Policy,
     }),
     "coffee-push": AttrDict({
         "task_name": "coffee-push",
         "env": ALL_V2_ENVS["coffee-push-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-push"),
+        "seed_dataset": os.path.join(env_root, "seed/coffee-push"),
         "expert_policy": policies.SawyerCoffeePushV2Policy,
     }),
     "coffee-pull": AttrDict({
         "task_name": "coffee-pull",
         "env": ALL_V2_ENVS["coffee-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-pull"),
+        "seed_dataset": os.path.join(env_root, "seed/coffee-pull"),
         "expert_policy": policies.SawyerCoffeePullV2Policy,
     }),
     "stick-pull": AttrDict({
         "task_name": "stick-pull",
         "env": ALL_V2_ENVS["stick-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/stick-pull"),
+        "seed_dataset": os.path.join(env_root, "seed/stick-pull"),
         "expert_policy": policies.SawyerStickPullV2Policy,
     }),
     "door-close": AttrDict({
         "task_name": "door-close",
         "env": ALL_V2_ENVS["door-close-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/door-close"),
+        "seed_dataset": os.path.join(env_root, "seed/door-close"),
         "expert_policy": policies.SawyerDoorCloseV2Policy,
     }),
     "door-lock": AttrDict({
         "task_name": "door-lock",
         "env": ALL_V2_ENVS["door-lock-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/door-lock"),
+        "seed_dataset": os.path.join(env_root, "seed/door-lock"),
         "expert_policy": policies.SawyerDoorLockV2Policy,
     }),
     "door-unlock": AttrDict({
         "task_name": "door-unlock",
         "env": ALL_V2_ENVS["door-unlock-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/door-unlock"),
+        "seed_dataset": os.path.join(env_root, "seed/door-unlock"),
         "expert_policy": policies.SawyerDoorUnlockV2Policy,
     }),
     "basketball": AttrDict({
         "task_name": "basketball",
         "env": ALL_V2_ENVS["basketball-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/basketball"),
+        "seed_dataset": os.path.join(env_root, "seed/basketball"),
         "expert_policy": policies.SawyerBasketballV2Policy,
     }),
     "bin-picking": AttrDict({
         "task_name": "bin-picking",
         "env": ALL_V2_ENVS["bin-picking-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/bin-picking"),
+        "seed_dataset": os.path.join(env_root, "seed/bin-picking"),
         "expert_policy": policies.SawyerBinPickingV2Policy,
     }),
     "box-close": AttrDict({
         "task_name": "box-close",
         "env": ALL_V2_ENVS["box-close-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/box-close"),
+        "seed_dataset": os.path.join(env_root, "seed/box-close"),
         "expert_policy": policies.SawyerBoxCloseV2Policy,
     }),
     "button-press-topdown": AttrDict({
         "task_name": "button-press-topdown",
         "env": ALL_V2_ENVS["button-press-topdown-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/button-press-topdown"),
+        "seed_dataset": os.path.join(env_root, "seed/button-press-topdown"),
         "expert_policy": policies.SawyerButtonPressTopdownV2Policy,
     }),
     "button-press-topdown-wall": AttrDict({
         "task_name": "button-press-topdown-wall",
         "env": ALL_V2_ENVS["button-press-topdown-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/button-press-topdown-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/button-press-topdown-wall"),
         "expert_policy": policies.SawyerButtonPressTopdownWallV2Policy,
     }),
     "button-press": AttrDict({
         "task_name": "button-press",
         "env": ALL_V2_ENVS["button-press-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/button-press"),
+        "seed_dataset": os.path.join(env_root, "seed/button-press"),
         "expert_policy": policies.SawyerButtonPressV2Policy,
     }),
     "button-press-wall": AttrDict({
         "task_name": "button-press-wall",
         "env": ALL_V2_ENVS["button-press-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/button-press-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/button-press-wall"),
         "expert_policy": policies.SawyerButtonPressWallV2Policy,
     }),
     "coffee-button": AttrDict({
         "task_name": "coffee-button",
         "env": ALL_V2_ENVS["coffee-button-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/coffee-button"),
+        "seed_dataset": os.path.join(env_root, "seed/coffee-button"),
         "expert_policy": policies.SawyerCoffeeButtonV2Policy,
     }),
     "dial-turn": AttrDict({
         "task_name": "dial-turn",
         "env": ALL_V2_ENVS["dial-turn-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/dial-turn"),
+        "seed_dataset": os.path.join(env_root, "seed/dial-turn"),
         "expert_policy": policies.SawyerDialTurnV2Policy,
     }),
     "disassemble": AttrDict({
         "task_name": "disassemble",
         "env": ALL_V2_ENVS["disassemble-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/disassemble"),
+        "seed_dataset": os.path.join(env_root, "seed/disassemble"),
         "expert_policy": policies.SawyerDisassembleV2Policy,
     }),
     "hand-insert": AttrDict({
         "task_name": "hand-insert",
         "env": ALL_V2_ENVS["hand-insert-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/hand-insert"),
+        "seed_dataset": os.path.join(env_root, "seed/hand-insert"),
         "expert_policy": policies.SawyerHandInsertV2Policy,
     }),
     "drawer-close": AttrDict({
         "task_name": "drawer-close",
         "env": ALL_V2_ENVS["drawer-close-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/drawer-close"),
+        "seed_dataset": os.path.join(env_root, "seed/drawer-close"),
         "expert_policy": policies.SawyerDrawerCloseV2Policy,
     }),
     "drawer-open": AttrDict({
         "task_name": "drawer-open",
         "env": ALL_V2_ENVS["drawer-open-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/drawer-open"),
+        "seed_dataset": os.path.join(env_root, "seed/drawer-open"),
         "expert_policy": policies.SawyerDrawerOpenV2Policy,
     }),
     "faucet-open": AttrDict({
         "task_name": "faucet-open",
         "env": ALL_V2_ENVS["faucet-open-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/faucet-open"),
+        "seed_dataset": os.path.join(env_root, "seed/faucet-open"),
         "expert_policy": policies.SawyerFaucetOpenV2Policy,
     }),
     "faucet-close": AttrDict({
         "task_name": "faucet-close",
         "env": ALL_V2_ENVS["faucet-close-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/faucet-close"),
+        "seed_dataset": os.path.join(env_root, "seed/faucet-close"),
         "expert_policy": policies.SawyerFaucetCloseV2Policy,
     }),
     "hammer": AttrDict({
         "task_name": "hammer",
         "env": ALL_V2_ENVS["hammer-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/hammer"),
+        "seed_dataset": os.path.join(env_root, "seed/hammer"),
         "expert_policy": policies.SawyerHammerV2Policy,
     }),
     "handle-press-side": AttrDict({
         "task_name": "handle-press-side",
         "env": ALL_V2_ENVS["handle-press-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/handle-press-side"),
+        "seed_dataset": os.path.join(env_root, "seed/handle-press-side"),
         "expert_policy": policies.SawyerHandlePressSideV2Policy,
     }),
     "handle-press": AttrDict({
         "task_name": "handle-press",
         "env": ALL_V2_ENVS["handle-press-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/handle-press"),
+        "seed_dataset": os.path.join(env_root, "seed/handle-press"),
         "expert_policy": policies.SawyerHandlePressV2Policy,
     }),
     "handle-pull-side": AttrDict({
         "task_name": "handle-pull-side",
         "env": ALL_V2_ENVS["handle-pull-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/handle-pull-side"),
+        "seed_dataset": os.path.join(env_root, "seed/handle-pull-side"),
         "expert_policy": policies.SawyerHandlePullSideV2Policy,
     }),
     "handle-pull": AttrDict({
         "task_name": "handle-pull",
         "env": ALL_V2_ENVS["handle-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/handle-pull"),
+        "seed_dataset": os.path.join(env_root, "seed/handle-pull"),
         "expert_policy": policies.SawyerHandlePullV2Policy,
     }),
     "lever-pull": AttrDict({
         "task_name": "lever-pull",
         "env": ALL_V2_ENVS["lever-pull-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/lever-pull"),
+        "seed_dataset": os.path.join(env_root, "seed/lever-pull"),
         "expert_policy": policies.SawyerLeverPullV2Policy,
     }),
     "peg-insert-side": AttrDict({
         "task_name": "peg-insert-side",
         "env": ALL_V2_ENVS["peg-insert-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/peg-insert-side"),
+        "seed_dataset": os.path.join(env_root, "seed/peg-insert-side"),
         "expert_policy": policies.SawyerPegInsertionSideV2Policy,
     }),
     "pick-out-of-hole": AttrDict({
         "task_name": "pick-out-of-hole",
         "env": ALL_V2_ENVS["pick-out-of-hole-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/pick-out-of-hole"),
+        "seed_dataset": os.path.join(env_root, "seed/pick-out-of-hole"),
         "expert_policy": policies.SawyerPickOutOfHoleV2Policy,
     }),
     "reach": AttrDict({
         "task_name": "reach",
         "env": ALL_V2_ENVS["reach-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/reach"),
+        "seed_dataset": os.path.join(env_root, "seed/reach"),
         "expert_policy": policies.SawyerReachV2Policy,
     }),
     "push-back": AttrDict({
         "task_name": "push-back",
         "env": ALL_V2_ENVS["push-back-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/push-back"),
+        "seed_dataset": os.path.join(env_root, "seed/push-back"),
         "expert_policy": policies.SawyerPushBackV2Policy,
     }),
     "push": AttrDict({
         "task_name": "push",
         "env": ALL_V2_ENVS["push-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/push-back"),
+        "seed_dataset": os.path.join(env_root, "seed/push-back"),
         "expert_policy": policies.SawyerPushV2Policy,
     }),
     "pick-place": AttrDict({
         "task_name": "pick-place",
         "env": ALL_V2_ENVS["pick-place-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/pick-place"),
+        "seed_dataset": os.path.join(env_root, "seed/pick-place"),
         "expert_policy": policies.SawyerPickPlaceV2Policy,
     }),
     "plate-slide": AttrDict({
         "task_name": "plate-slide",
         "env": ALL_V2_ENVS["plate-slide-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide"),
+        "seed_dataset": os.path.join(env_root, "seed/plate-slide"),
         "expert_policy": policies.SawyerPlateSlideV2Policy,
     }),
     "plate-slide-back": AttrDict({
         "task_name": "plate-slide-back",
         "env": ALL_V2_ENVS["plate-slide-back-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/plate-slide-back"),
+        "seed_dataset": os.path.join(env_root, "seed/plate-slide-back"),
         "expert_policy": policies.SawyerPlateSlideBackV2Policy,
     }),
     "peg-unplug-side": AttrDict({
         "task_name": "peg-unplug-side",
         "env": ALL_V2_ENVS["peg-unplug-side-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/peg-unplug-side"),
+        "seed_dataset": os.path.join(env_root, "seed/peg-unplug-side"),
         "expert_policy": policies.SawyerPegUnplugSideV2Policy,
     }),
     "soccer": AttrDict({
         "task_name": "soccer",
         "env": ALL_V2_ENVS["soccer-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/soccer"),
+        "seed_dataset": os.path.join(env_root, "seed/soccer"),
         "expert_policy": policies.SawyerSoccerV2Policy,
     }),
     "stick-push": AttrDict({
         "task_name": "stick-push",
         "env": ALL_V2_ENVS["stick-push-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/stick-push"),
+        "seed_dataset": os.path.join(env_root, "seed/stick-push"),
         "expert_policy": policies.SawyerStickPushV2Policy,
     }),
     "push-wall": AttrDict({
         "task_name": "push-wall",
         "env": ALL_V2_ENVS["push-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/push-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/push-wall"),
         "expert_policy": policies.SawyerPushWallV2Policy,
     }),
     "reach-wall": AttrDict({
         "task_name": "reach-wall",
         "env": ALL_V2_ENVS["reach-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/reach-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/reach-wall"),
         "expert_policy": policies.SawyerReachWallV2Policy,
     }),
     "shelf-place": AttrDict({
         "task_name": "shelf-place",
         "env": ALL_V2_ENVS["shelf-place-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/shelf-place"),
+        "seed_dataset": os.path.join(env_root, "seed/shelf-place"),
         "expert_policy": policies.SawyerShelfPlaceV2Policy,
     }),
     "sweep-into": AttrDict({
         "task_name": "sweep-into",
         "env": ALL_V2_ENVS["sweep-into-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/sweep-into"),
+        "seed_dataset": os.path.join(env_root, "seed/sweep-into"),
         "expert_policy": policies.SawyerSweepIntoV2Policy,
     }),
     "sweep": AttrDict({
         "task_name": "sweep",
         "env": ALL_V2_ENVS["sweep-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/sweep"),
+        "seed_dataset": os.path.join(env_root, "seed/sweep"),
         "expert_policy": policies.SawyerSweepV2Policy,
     }),
     "window-open": AttrDict({
         "task_name": "window-open",
         "env": ALL_V2_ENVS["window-open-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/window-open"),
+        "seed_dataset": os.path.join(env_root, "seed/window-open"),
         "expert_policy": policies.SawyerWindowOpenV2Policy,
     }),
     "window-close": AttrDict({
         "task_name": "window-close",
         "env": ALL_V2_ENVS["window-close-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/window-close"),
+        "seed_dataset": os.path.join(env_root, "seed/window-close"),
         "expert_policy": policies.SawyerWindowCloseV2Policy,
     })
 }
@@ -320,7 +320,7 @@ tasks = {
 seed_tasks_list = [
     "pick-place-wall",
 ]
-seed_dataset_dir = os.path.join(env_root, "data/seed")
+seed_dataset_dir = os.path.join(env_root, "seed")
 seed_n_demos = 5
 seed_do_render = True
 seed_save_env_and_goal = False
@@ -332,7 +332,7 @@ seed_dataset_kwargs = AttrDict({
 
 
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_dataset_dir = os.path.join(env_root, "prior")
 prior_n_demos = 85
 prior_do_render = True
 prior_save_env_and_goal = False

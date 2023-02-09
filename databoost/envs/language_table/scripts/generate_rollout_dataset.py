@@ -183,7 +183,7 @@ class DatasetSaver:
 if __name__ == "__main__":
     BATCH = sys.argv[1]
     DatasetSaver(BATCH).generate_dataset(
-        policy_checkpt='/home/jullian-yapeter/data/DataBoostBenchmark/language_table/models/dummy/separate/BC_Mixed/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt',
-        dest_dir=f'/data/karl/data/table_sim/rollout_data/batch{BATCH}',
+        policy_checkpt='CurateDataset/language_table/models/dummy/separate/BC_Mixed/language_table-separate-BC_Mixed-goal_cond_False-mask_goal_pos_False-best.pt',
+        dest_dir=f'',
         #n_episodes=1000,
     )

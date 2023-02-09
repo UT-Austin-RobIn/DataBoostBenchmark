@@ -107,7 +107,7 @@ if __name__ == "__main__":
     goal_condition = False
     mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-{sys.argv[1]}"
-    dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}/{sys.argv[1]}/"
+    dest_dir = f"CurateDataset/{benchmark_name}/models/dummy/{task_name}/{boosting_method}/{sys.argv[1]}/"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
@@ -219,8 +219,8 @@ if __name__ == "__main__":
         resume=exp_name,
         project="boost",
         config=configs,
-        dir="/home/sdass/tmp",
-        entity="clvr",
+        dir="/home/tmp",
+        entity="",
         notes="",
     )
 
