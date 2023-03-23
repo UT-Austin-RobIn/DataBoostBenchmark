@@ -6,7 +6,7 @@ import os
 import tqdm
 
 
-DATA_DIR = "/data/karl/data/table_sim/prior_data"
+DATA_DIR = "/data/sdass/DataBoostBenchmark/language_table/data/separate_oracle_data/processed/"
 SUFFIX = "_clip"
 
 
