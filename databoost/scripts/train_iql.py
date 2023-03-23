@@ -110,7 +110,11 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
+<<<<<<< HEAD
     boosting_method = "bc"
+=======
+    boosting_method = "action"
+>>>>>>> 52d374267afc0a7c4936f06acee87a4ef5b0d39f
     goal_condition = False
     mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-{sys.argv[1]}"
@@ -122,6 +126,27 @@ if __name__ == "__main__":
 
     dataloader_configs = {
         "dataset_dir": [
+            # "/data/jullian-yapeter/old_boosted_data/separate/Action/part_0/data/seed/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/Action/part_0/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/Action/part_1/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/Action/part_2/data/retrieved/",
+
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_0/data/seed/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_0/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_1/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_2/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_3/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/CLIPLang/part_4/data/retrieved/"
+
+            "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_0/data/seed/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_0/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_1/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_2/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_3/data/retrieved/",
+            # "/data/jullian-yapeter/old_boosted_data/separate/R3M/part_4/data/retrieved/"
+
+            "/data/jullian-yapeter/old_boosted_data/separate/Handcraft/data/"
+
             # "/home/jullian-yapeter/data/boosted_data/language_table/Seed",
 
             # "/home/karl/data/language_table/seed_separate_wider_support",

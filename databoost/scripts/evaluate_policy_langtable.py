@@ -12,17 +12,27 @@ from torch import nn as nn
 from databoost.models.iql.iql import IQLModel
 from databoost.models.bc import BCPolicy, TanhGaussianBCPolicy
 from databoost.utils.general import AttrDict
+import sys
 
 # random.seed(42)
 
+<<<<<<< HEAD
 exp_name = "iql-bc_boost"
 boosting_method = "bc"
+=======
+exp_name = sys.argv[1]
+boosting_method = "action"
+>>>>>>> 52d374267afc0a7c4936f06acee87a4ef5b0d39f
 policy_filename = f"/data/sdass/DataBoostBenchmark/language_table/models/dummy/separate/{boosting_method}/{exp_name}/language_table-separate-{boosting_method}-{exp_name}"
 
 benchmark = "language_table"
 task = "separate"
 
+<<<<<<< HEAD
 n_chkpt = int(200e3)
+=======
+n_chkpt = int(sys.argv[2])*1000
+>>>>>>> 52d374267afc0a7c4936f06acee87a4ef5b0d39f
 n_window = 5
 n_period = 2e3
 n_episodes = 20
