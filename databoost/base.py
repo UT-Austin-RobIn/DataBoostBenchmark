@@ -8,10 +8,7 @@ import gym
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import (
-    Dataset, DataLoader, LTD_CACHE_MAX,
-    GOAL_DIST, GOAL_WINDOW
-)
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
