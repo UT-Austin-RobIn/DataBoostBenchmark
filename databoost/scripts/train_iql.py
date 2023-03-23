@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "demo"
+    boosting_method = "bc"
     goal_condition = False
     mask_goal_pos = False
     exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-{sys.argv[1]}"
@@ -127,6 +127,11 @@ if __name__ == "__main__":
             # "/home/karl/data/language_table/seed_separate_wider_support",
             # "/home/karl/data/language_table/prior_data_clip",
             # "/data/karl/data/table_sim/rollout_data",
+            "/data/jullian-yapeter/DataBoostBenchmark/language_table/boosted_data/separate/BC_5parts_100xeach/part_1/data/seed/",
+            "/data/jullian-yapeter/DataBoostBenchmark/language_table/boosted_data/separate/BC_5parts_100xeach/part_1/data/retireved/",
+            "/data/jullian-yapeter/DataBoostBenchmark/language_table/boosted_data/separate/BC_5parts_100xeach/part_2/data/retrieved/",
+            "/data/jullian-yapeter/DataBoostBenchmark/language_table/boosted_data/separate/BC_5parts_100xeach/part_3/data/retrived/",
+
 
             # '/home/sdass/boosting/data/langtable/seed/',
             # '/home/sdass/boosting/data/langtable/retrieved/',
