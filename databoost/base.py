@@ -44,16 +44,10 @@ class DataBoostEnvWrapper(gym.Wrapper):
     '''
     def __init__(self,
                  env: gym.Env,
-                 prior_dataset_url: str,
-                 seed_dataset_url: str,
                  render_func: Callable,
-                 postproc_func: Callable = None,
-                 test_dataset_url: str = None):
+                 postproc_func: Callable = None,):
         super().__init__(env)
         self.env = env
-        self.prior_dataset_url = prior_dataset_url
-        self.seed_dataset_url = seed_dataset_url
-        self.test_dataset_url = test_dataset_url
         self.render_func = render_func
         self.postproc_func = postproc_func
 
@@ -102,80 +96,6 @@ class DataBoostEnvWrapper(gym.Wrapper):
         '''
         dataset = DataBoostDataset(dataset_dir, n_demos, seq_len, load_imgs=load_imgs, postproc_func=self.postproc_func, goal_condition=goal_condition)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    def get_seed_dataset(self, n_demos: int = None) -> Dataset:
-        '''loads offline seed dataset corresponding to this environment & task
-        Args:
-            n_demos [int]: number of demos from dataset to load (if None, load all)
-        Returns:
-            trajs [AttrDict]: dataset as an AttrDict
-        '''
-        assert self.seed_dataset_url is not None
-        return self._get_dataset(self.seed_dataset_url, n_demos)
-
-    def get_prior_dataset(self, n_demos: int = None) -> Dataset:
-        '''loads offline prior dataset corresponding to this environment
-        Args:
-            n_demos [int]: number of demos from dataset to load (if None, load all)
-        Returns:
-            trajs [AttrDict]: dataset as an AttrDict
-        '''
-        assert self.prior_dataset_url is not None
-        return self._get_dataset(self.prior_dataset_url, n_demos)
-
-    def get_seed_dataloader(self,
-                            n_demos: int = None,
-                            seq_len: int = None,
-                            batch_size: int = 1,
-                            shuffle: bool = True,
-                            load_imgs: bool = True,
-                            goal_condition: bool = False) -> DataLoader:
-        '''gets a dataloader for this benchmark's seed dataset.
-
-        Args:
-            n_demos [int]: the number of demos (h5 files) to retrieve from the
-                           dataset dir
-            seq_len [int]: the window length with which to split demonstrations
-            batch_size [int]: number of sequences to load in as a batch
-            shuffle [bool]: shuffle sequences to be loaded
-        Returns:
-            dataloader [DataLoader]: seed DataLoader for this benchmark
-        '''
-        assert self.seed_dataset_url is not None
-        return self._get_dataloader(self.seed_dataset_url,
-                                    n_demos=n_demos,
-                                    seq_len=seq_len,
-                                    batch_size=batch_size,
-                                    shuffle=shuffle,
-                                    load_imgs=load_imgs,
-                                    goal_condition=goal_condition)
-
-    def get_prior_dataloader(self,
-                             n_demos: int = None,
-                             seq_len: int = None,
-                             batch_size: int = 1,
-                             shuffle: bool = True,
-                             load_imgs: bool = True,
-                             goal_condition: bool = False) -> DataLoader:
-        '''gets a dataloader for this benchmark's prior dataset.
-
-        Args:
-            n_demos [int]: the number of demos (h5 files) to retrieve from the
-                           dataset dir
-            seq_len [int]: the window length with which to split demonstrations
-            batch_size [int]: number of sequences to load in as a batch
-            shuffle [bool]: shuffle sequences to be loaded
-        Returns:
-            dataloader [DataLoader]: prior DataLoader for this benchmark
-        '''
-        assert self.prior_dataset_url is not None
-        return self._get_dataloader(self.prior_dataset_url,
-                                    n_demos=n_demos,
-                                    seq_len=seq_len,
-                                    batch_size=batch_size,
-                                    shuffle=shuffle,
-                                    load_imgs=load_imgs,
-                                    goal_condition=goal_condition)
 
     def default_render(self) -> np.ndarray:
         '''standard API to wrap environment-specific render function with
@@ -381,34 +301,7 @@ class DataBoostDataset(Dataset):
                 if "seed" not in dataset_dir:
                     file_paths = [fp for fp in file_paths if "pick-place-wall" not in fp]
 
-        # ######### Load in handcrafted files
-        # print("Oracle appending...")
-        # file_paths += read_json("/home/jullian-yapeter/code/data_boost/selected_seeds.json")
-        # #########
-
-        print(f"found {len(file_paths)} files")
-        #file_paths = file_paths[:1000]
-        if self.seq_len is None:
-            if n_demos is None: n_demos = len(file_paths)
-            # if no seq_len is given, no need to proceed with slicing.
-            # use whole trajectories.
-            assert len(file_paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(file_paths)}"
-            self.paths = random.sample(file_paths, n_demos)
-
-            self.slices = []
-            for path_id, path in enumerate(self.paths):
-                traj_data = read_h5(path, load_imgs=load_imgs)
-                if postproc_func is not None:
-                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                        postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
-                traj_len = self.get_traj_len(traj_data)
-                self.path_lens[path] = traj_len
-                self.limited_data_cache[path] = traj_data  # temp, for speed
-                self.slices.append((path_id, 0, traj_len))
-            print(f"Dataloader contains {len(self.slices)} slices")
-            return
-
+        # file_paths = file_paths[:500]
         # filter for files that are long enough
         print("filtering files of sufficient length")
         for file_path in tqdm(file_paths):
@@ -416,18 +309,10 @@ class DataBoostDataset(Dataset):
             if postproc_func is not None:
                 traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                     postproc_func(traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"])
-
-            # filter by instruction
-            if only_target and "language_table" in file_path:
-                inst = traj_data["infos"]["instruction"][0]
-                instruction_str = bytes(inst[np.where(inst != 0)].tolist()).decode("utf-8")
-                if "separate" not in instruction_str: continue
-            #import shutil
-            #if len(self.paths) < 100:
-            #    shutil.copyfile(file_path, "/home/karl/data/language_table/seed_task_separate/seed_episode_{}.h5".format(len(self.paths)))
-            #else:
-            #    exit(0)
-
+            
+            # normalize actions
+            traj_data["actions"] = (traj_data["actions"] - np.array([0.00011653, -0.0001171])) / np.array([0.01216072, 0.01504988])
+            
             traj_len = self.get_traj_len(traj_data)
             if traj_len >= seq_len:  # traj must be long enough
                 self.paths.append(file_path)
@@ -435,10 +320,6 @@ class DataBoostDataset(Dataset):
                 self.path_lens[file_path] = traj_len
         print(f"{len(self.paths)}/{len(file_paths)} trajectories "
               "are of sufficient length")
-        if n_demos is None: n_demos = len(self.paths)
-        assert len(self.paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(self.paths)}"
-        self.paths = random.sample(self.paths, n_demos)
 
         self.slices = []
         if self.goal_condition: self.pretrain_goals = []  # actionable models style random goals (~200 steps ahead)

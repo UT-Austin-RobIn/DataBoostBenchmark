@@ -16,6 +16,7 @@ from language_table.environments import blocks
 from language_table.environments import language_table
 from language_table.environments.rewards import block2block, separate_blocks
 from r3m import load_r3m
+from PIL import Image
 
 
 class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
@@ -27,6 +28,17 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         self.r3m.eval()
         self.r3m.to(self.device)
         self.clip_model, _ = clip.load("ViT-B/32", device=self.device)
+        n_px = self.clip_model.input_resolution.item()
+        self.clip_preprocess = torchvision.transforms.Compose([
+                torchvision.transforms.Resize(n_px, interpolation=Image.BICUBIC),
+                torchvision.transforms.CenterCrop(n_px),
+                # lambda image: image.convert("RGB"),
+                # torchvision.transforms.ToTensor()
+                torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+            ])
+
+        self.act_norm_mean = torch.tensor([0.00011653, -0.0001171], requires_grad = False)
+        self.act_norm_stddev = torch.tensor([0.01216072, 0.01504988], requires_grad = False)
 
     def get_env(self, task_name: str) -> DataBoostEnvWrapper:
         '''get the wrapped gym environment corresponding to the specified task.
@@ -39,13 +51,24 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
                                        the corresponding seed and prior offline
                                        datasets
         '''
+        # def language_table_preproc(action):
+        #     '''unnormalize actions'''
+        #     return action * self.act_norm_stddev + self.act_norm_mean
+
         def language_table_postproc(obs, reward, done, info):
             '''Prepare observation.'''
             if isinstance(obs, dict):
-                # encode images with R3M
+                
                 img = torch.from_numpy(obs['rgb'].transpose(2, 0, 1)).to(self.device)[None]
+
+                clip_tokenized_imgs = self.clip_preprocess(torch.tensor(img)/255)
+                clip_encs = self.clip_model.encode_image(clip_tokenized_imgs.to(self.device)).data.cpu().numpy()[0]
+
+                # encode images with R3M
+                img = torchvision.transforms.functional.crop(img, top=0, left=100, height=img.shape[2], width=img.shape[3]-200)
                 img = torchvision.transforms.Resize((224, 224))(img)
-                img_obs = self.r3m(img).data.cpu().numpy()[0]  # [2048,]
+                r3m_encs = self.r3m(img).data.cpu().numpy()[0]  # [2048,]
+                img_obs = np.concatenate((clip_encs, r3m_encs), axis=-1)
 
                 # encode text with CLIP
                 inst = obs['instruction']
@@ -64,9 +87,6 @@ class DataBoostBenchmarkLanguageTable(DataBoostBenchmarkBase):
         )
         env = DataBoostEnvWrapper(
                 env,
-                seed_dataset_url="/data/karl/data/table_sim/prior_data",
-                prior_dataset_url="/data/karl/data/table_sim/prior_data",
-                test_dataset_url="/data/karl/data/table_sim/prior_data",
                 render_func=lambda x: x.render()[:, :, ::-1],
                 postproc_func=language_table_postproc,
             )

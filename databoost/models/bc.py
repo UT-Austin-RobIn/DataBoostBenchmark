@@ -11,8 +11,7 @@ class BCPolicy(nn.Module):
                  obs_dim: int,
                  action_dim: int,
                  hidden_dim: int,
-                 n_hidden_layers: int,
-                 dropout_rate: float):
+                 n_hidden_layers: int):
         '''Baseline BC policy.
 
         Args:
@@ -27,17 +26,19 @@ class BCPolicy(nn.Module):
         '''
         super().__init__()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.norm = nn.BatchNorm1d
+        
         print(f"obs_dim: {obs_dim}")
         net_layers = nn.ModuleList()
         net_layers.append(nn.Linear(obs_dim, hidden_dim))
-        net_layers.append(nn.LayerNorm(hidden_dim))
+        net_layers.append(self.norm(hidden_dim))
         net_layers.append(nn.LeakyReLU())
-        net_layers.append(nn.Dropout(p=dropout_rate))
+        # net_layers.append(nn.Dropout(p=dropout_rate))
         for _ in range(n_hidden_layers):
             net_layers.append(nn.Linear(hidden_dim, hidden_dim))
-            net_layers.append(nn.LayerNorm(hidden_dim))
+            net_layers.append(self.norm(hidden_dim))
             net_layers.append(nn.LeakyReLU())
-            net_layers.append(nn.Dropout(p=dropout_rate))
+            # net_layers.append(nn.Dropout(p=dropout_rate))
         net_layers.append(nn.Linear(hidden_dim, action_dim * 2))
         self.net = nn.Sequential(*net_layers).float().to(self.device)
 
@@ -61,11 +62,6 @@ class BCPolicy(nn.Module):
         act_dist = MultivariateGaussian(self.net(obs_batch))
         return act_dist
 
-    def _tanh_squash_output(self, action, log_prob):
-        """Passes continuous output through a tanh function to constrain action range, adjusts log_prob."""
-        log_prob_update = 2 * (np.log(2.) - action - torch.nn.functional.softplus(-2. * action)).sum(dim=-1)
-        return log_prob - log_prob_update
-
     def loss(self,
              pred_act_dist: MultivariateGaussian,
              action_batch: torch.Tensor) -> torch.float:
@@ -80,7 +76,7 @@ class BCPolicy(nn.Module):
         '''
         # loss = pred_act_dist.nll(action_batch).mean()
         log_prob = pred_act_dist.log_prob(action_batch)
-        log_prob = self._tanh_squash_output(action_batch, log_prob)
+        # log_prob = self._tanh_squash_output(action_batch, log_prob)
         loss = -1 * log_prob.mean()
         return loss
 
@@ -93,13 +89,17 @@ class BCPolicy(nn.Module):
             act [np.ndarray]: an action from the policy
         '''
         with torch.no_grad():
+            self.eval()
             ob = torch.tensor(ob[None], dtype=torch.float).to(self.device)
             act_dist = MultivariateGaussian(self.net(ob))
             # act = act_dist.mu.cpu().detach().numpy()[0]
             mean = act_dist.mu
-            mean = torch.tanh(mean)
+            # mean = torch.tanh(mean)
             act = mean.cpu().detach().numpy()[0]
-            return act
+            
+            # unnormalize actions
+            self.train()
+            return act * np.array([0.01216072, 0.01504988]) + np.array([0.00011653, -0.0001171])
 
 
 class TanhGaussianBCPolicy(TanhGaussianMLPPolicy):

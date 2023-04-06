@@ -25,8 +25,8 @@ from databoost.utils.data import dump_video_wandb
 # ''''''
 
 
-np.random.seed(88)
-random.seed(88)
+# np.random.seed(88)
+# random.seed(88)
 
 
 def train(policy: nn.Module,
@@ -69,7 +69,7 @@ def train(policy: nn.Module,
             #text_tokens = model.encode_text(text_tokens)
             #obs_batch = torch.cat((obs_batch, text_tokens), dim=-1)
 
-            pred_action_dist, _ = policy(obs_batch)
+            pred_action_dist = policy(obs_batch)
             action_batch = traj_batch["actions"].to(device)
             action_batch = action_batch[:, 0, :]  # remove the window dimension, since just 1
             loss = policy.loss(pred_action_dist, action_batch)
@@ -119,41 +119,18 @@ if __name__ == "__main__":
 
     benchmark_name = "language_table"
     task_name = "separate"
-    boosting_method = "Action_0pt1_9"
+    boosting_method = "all_data"
     goal_condition = False
     mask_goal_pos = False
-    exp_name = f"{benchmark_name}-{task_name}-{boosting_method}-goal_cond_{goal_condition}-mask_goal_pos_{mask_goal_pos}"
-    dest_dir = f"/home/jullian-yapeter/data/DataBoostBenchmark/{benchmark_name}/models/dummy/{boosting_method}/{task_name}/{boosting_method}"
+    exp_name = f"{benchmark_name}-{task_name}-langtable_fixes-large_model-batchnorm"
+    dest_dir = f"/data/sdass/DataBoostBenchmark/{benchmark_name}/models/dummy/{task_name}/{boosting_method}"
 
     benchmark_configs = {
         "benchmark_name": benchmark_name,
     }
 
     dataloader_configs = {
-        #"dataset_dir": "/data/karl/data/table_sim/prior_data_clip",
-        # "dataset_dir": "/home/karl/data/language_table/prior_data_clip",
-        # "dataset_dir": [
-        #     "/home/karl/data/language_table/prior_data_clip",
-        #     "/data/karl/data/language_table/rl_episodes"
-        # ],
-        # "/home/karl/data/language_table/seed_task_separate",
-        # "/home/karl/data/language_table/prior_data_clip",
-        # "/data/karl/data/language_table/rl_episodes"
-        # f"/home/jullian-yapeter/data/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/data",
-        # "/home/jullian-yapeter/data/boosted_data/language_table/separate/Handcraft/data"
-        
-        "dataset_dir": [
-            f"/data/jullian-yapeter/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/part_1/data/seed",
-        ] + [
-            f"/data/jullian-yapeter/boosted_data/{benchmark_name}/{task_name}/{boosting_method}/part_{idx + 1}/data/retrieved" \
-            for idx in range(9)
-        ],
-
-        # "dataset_dir": [
-        #     "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/seed",
-        #     "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/demonstration",
-        #     # "/home/jullian-yapeter/data/DataBoostBenchmark/metaworld/dataset/autonomous",
-        # ],
+        "dataset_dir": "/data/sdass/DataBoostBenchmark/language_table/data/separate_oracle_data/processed_clip/",
         "n_demos": None,
         "batch_size": 128,
         "seq_len": 1,
@@ -162,38 +139,38 @@ if __name__ == "__main__":
         "goal_condition": goal_condition
     }
 
-    # policy_configs = {
-    #     #"obs_dim": 2048 + 77 * (2 if goal_condition else 1),
-    #     "obs_dim": 2048 + 512,
-    #     "action_dim": 2,
-    #     "hidden_dim": 512,
-    #     "n_hidden_layers": 4,
-    #     "dropout_rate": 0.4
-    # }
     policy_configs = {
-        "env_spec": AttrDict({
-            "observation_space": AttrDict({
-                "flat_dim": 2048 + 512
-            }),
-            "action_space": AttrDict({
-                "flat_dim": 2
-            })
-        }),
-        "hidden_sizes": [512, 512, 512, 512],
-        "act_range": 0.1,
-        "hidden_nonlinearity": nn.ReLU,
-        "output_nonlinearity": None,
-        "min_std": np.exp(-20.),
-        "max_std": np.exp(2.)
+        #"obs_dim": 2048 + 77 * (2 if goal_condition else 1),
+        "obs_dim": 2048 + 2*512,
+        "action_dim": 2,
+        "hidden_dim": 2048,
+        "n_hidden_layers": 5,
+        # "dropout_rate": 0.0
     }
+    # policy_configs = {
+    #     "env_spec": AttrDict({
+    #         "observation_space": AttrDict({
+    #             "flat_dim": 2048 + 512
+    #         }),
+    #         "action_space": AttrDict({
+    #             "flat_dim": 2
+    #         })
+    #     }),
+    #     "hidden_sizes": [512, 512, 512, 512],
+    #     "act_range": 0.1,
+    #     "hidden_nonlinearity": nn.ReLU,
+    #     "output_nonlinearity": None,
+    #     "min_std": np.exp(-20.),
+    #     "max_std": np.exp(2.)
+    # }
 
     train_configs = {
         "exp_name": exp_name,
         "benchmark_name": benchmark_name,
         "task_name": task_name,
         "dest_dir": dest_dir,
-        "eval_period": 1e3,
-        "eval_episodes": 0,  # 50,
+        "eval_period": 1e4,
+        "eval_episodes": 10,  # 50,
         "max_traj_len": 120,  # 120,
         "n_steps": 5e5,  # 5e5
         "goal_condition": goal_condition
@@ -202,7 +179,7 @@ if __name__ == "__main__":
     eval_configs = {
         "task_name": task_name,
         "n_episodes": 20,  # 50
-        "max_traj_len": 120,  # 120,
+        "max_traj_len": 80,  # 120,
         "goal_cond": goal_condition,
     }
 
@@ -226,7 +203,7 @@ if __name__ == "__main__":
         resume=exp_name,
         project="boost",
         config=configs,
-        dir="/home/jullian-yapeter/tmp",
+        dir="/home/sdass/tmp",
         entity="clvr",
         notes="",
     )
@@ -236,8 +213,8 @@ if __name__ == "__main__":
     env = benchmark.get_env(task_name)
     dataloader = env._get_dataloader(**dataloader_configs)
 
-    # policy = BCPolicy(**policy_configs)
-    policy = TanhGaussianBCPolicy(**policy_configs)
+    policy = BCPolicy(**policy_configs)
+    # policy = TanhGaussianBCPolicy(**policy_configs)
     policy = train(policy=policy,
                    dataloader=dataloader,
                    benchmark=benchmark,
