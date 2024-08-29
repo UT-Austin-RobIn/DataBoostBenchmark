@@ -7,7 +7,8 @@ from databoost.utils.general import AttrDict
 
 
 '''General configs'''
-env_root = "data_and_models/metaworld"
+# path to the dataset folder
+env_root = "/home/shivin/Desktop/datamodels/data/metaworld/"
 
 
 '''Tasks configs'''
@@ -15,8 +16,8 @@ tasks = {
     "pick-place-wall": AttrDict({
         "task_name": "pick-place-wall",
         "env": ALL_V2_ENVS["pick-place-wall-v2"],
-        "seed_dataset": os.path.join(env_root, "data/seed/pick-place-wall"),
-        "test_dataset": os.path.join(env_root, "test/pick-place-wall"),
+        "seed_dataset": os.path.join(env_root, "seed/pick-place-wall"),
+        "test_dataset": os.path.join(env_root, "test"),
         "expert_policy": policies.SawyerPickPlaceWallV2Policy,
     }),
     "assembly": AttrDict({
@@ -332,7 +333,7 @@ seed_dataset_kwargs = AttrDict({
 
 
 prior_tasks_list = list(tasks.keys())
-prior_dataset_dir = os.path.join(env_root, "data/prior")
+prior_dataset_dir = os.path.join(env_root, "prior")
 prior_n_demos = 85
 prior_do_render = True
 prior_save_env_and_goal = False

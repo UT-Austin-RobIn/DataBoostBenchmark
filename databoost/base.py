@@ -9,9 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import (
-    Dataset, DataLoader, LTD_CACHE_MAX,
-    GOAL_DIST, GOAL_WINDOW
-)
+    Dataset, DataLoader)
 from tqdm import tqdm
 
 from databoost.utils.general import AttrDict
@@ -20,6 +18,9 @@ from databoost.utils.data import (
     get_start_end_idxs, concatenate_traj_data, get_traj_slice
 )
 
+GOAL_DIST = 200
+GOAL_WINDOW = 10
+LTD_CACHE_MAX = int(1e8)
 
 class DataBoostEnvWrapper(gym.Wrapper):
     '''DataBoost benchmark's gym wrapper to add offline dataset loading
@@ -324,7 +325,7 @@ class DataBoostBenchmarkBase:
         '''
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
-        policy = policy.detach().clone().eval().to(device)
+        
         n_successes = 0
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
@@ -446,27 +447,25 @@ class DataBoostDataset(Dataset):
         print("filtering files of sufficient length")
         for file_path in tqdm(file_paths):
             traj_data = read_h5(file_path, load_imgs=load_imgs)
-            if postproc_func is not None:
-                traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                    postproc_func(traj_data.get("observations"), traj_data.get(
-                        "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
             traj_len = self.get_traj_len(traj_data)
-            if traj_len >= seq_len:  # traj must be long enough
+
+            def filter_file(path):
+                # filter file based on path name
+                # if 'autonomous' in path:
+                #     return False
+                # for x in ['pick-place', 'hand-insert', 'push']:
+                #     if x in path:
+                #         return True
+                # return False
+                return True
+                                
+            if traj_len >= seq_len and filter_file(file_path):  # traj must be long enough
                 if postproc_func is not None:
                     traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                         postproc_func(traj_data.get("observations"), traj_data.get(
                             "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
-                    if "goal_observations" in traj_data:
-                        traj_data["goal_observations"], _, _, _ = \
-                            postproc_func(
-                                traj_data["goal_observations"], None, None, None)
-                        # If the trajectory has a goal_observations field, and
-                        # we want goal-conditioned observations (self.goal_condition == True)
-                        # then, we concatenate each sequence's goal observation
-                        # to each observation of the sequence
-                        if self.goal_condition:
-                            traj_data["observations"] = np.concatenate(
-                                (traj_data["observations"], np.repeat(traj_data["goal_observations"][None], len(traj_data["observations"]), axis=0)), axis=-1)
+
+                del traj_data['infos']
                 self.paths.append(file_path)
                 # [TEMP] for speed, cache everything
                 self.limited_data_cache[file_path] = traj_data
@@ -482,17 +481,19 @@ class DataBoostDataset(Dataset):
 
         self.slices = []
         if self.goal_condition and "goal_observations" not in traj_data:
-            # If traj doesn't already carry its own goals in "goal_observations"
-            # then we generate goals based on a fixed distance ahead.
-            # We use 200 (GOAL_DIST) as the default, with a random window of 10
-            # (GOAL_WINDOW).
             self.pretrain_goals = []
+
         for path_id, path in enumerate(self.paths):
             traj_len = self.path_lens[path]
             start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
             traj_slices = [(path_id, *start_end_idx)
                            for start_end_idx in start_end_idxs]
             self.slices += traj_slices
+            
+            # If traj doesn't already carry its own goals in "goal_observations"
+            # then we generate goals based on a fixed distance ahead.
+            # We use 200 (GOAL_DIST) as the default, with a random window of 10
+            # (GOAL_WINDOW).
             if self.goal_condition and "goal_observations" not in traj_data:
                 max_goal_idxs = [
                     min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
@@ -534,13 +535,8 @@ class DataBoostDataset(Dataset):
             return traj_data
         traj_len = self.path_lens[self.paths[path_id]]
         traj_seq = get_traj_slice(traj_data, traj_len, start_idx, end_idx)
+
         if self.goal_condition and "goal_observations" not in traj_data:
-            # Use this code to get a random goal from within the window,
-            # currently use last frame of traj data (end of h5 file).
-            # goal_idx = random.randint(goal_min_idx, goal_max_idx)
-            # goal_frame = get_traj_slice(
-            #     traj_data, traj_len, goal_max_idx, goal_max_idx + 1)
-            #####
             _, goal_max_idx = self.pretrain_goals[idx]
             goal_obs = traj_data["observations"][goal_max_idx].copy()[None]
             traj_seq["observations"] = np.concatenate(

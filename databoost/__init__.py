@@ -1,12 +1,10 @@
 # TODO: Maybe only import the specific environment when required
 from databoost.base import DataBoostBenchmarkBase
 from databoost.envs.metaworld import DataBoostBenchmarkMetaworld
-from databoost.envs.language_table import DataBoostBenchmarkLanguageTable
 
 
 # dictionary of DataBoost's benchmark names and corresponding benchmark objects
 benchmarks = {
-    "language_table": DataBoostBenchmarkLanguageTable,
     "metaworld": DataBoostBenchmarkMetaworld,
 }
 
