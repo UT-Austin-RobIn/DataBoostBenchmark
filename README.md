@@ -51,3 +51,9 @@ gdown --no-cookies "1cWJOcRF2ixDD6h40XtmVSZB_Yf1ue3cu&confirm=t"
 If this fails for some reason, gdown would show which link this can manually be downloaded from.
 
 Change the env_root [here](https://github.com/jullian-yapeter/DataBoostBenchmark/blob/cd20e0aa2e85e7c6870fcc88ee529df4bd0e3ec2/databoost/envs/metaworld/config.py#L11) to point to the dataset path that was downloaded above. 
+
+## Testing
+```
+cd DataBoostBenchmark
+python datamodel_example.py
+```
