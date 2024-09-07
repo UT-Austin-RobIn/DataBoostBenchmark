@@ -34,7 +34,7 @@ The older version of metaworld needs some care with mujoco-py.
 
 ### Install DataBoostBenchmark
 ```
-git clone git@github.com:jullian-yapeter/DataBoostBenchmark.git
+git clone https://github.com/UT-Austin-RobIn/DataBoostBenchmark.git
 cd DataBoostBenchmark
 git checkout datamodels
 
