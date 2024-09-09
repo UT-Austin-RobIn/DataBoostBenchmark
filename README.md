@@ -52,8 +52,13 @@ If this fails for some reason, gdown would show which link this can manually be 
 
 Change the env_root [here](https://github.com/jullian-yapeter/DataBoostBenchmark/blob/cd20e0aa2e85e7c6870fcc88ee529df4bd0e3ec2/databoost/envs/metaworld/config.py#L11) to point to the dataset path that was downloaded above. 
 
-## Testing
+### Testing
 ```
 cd DataBoostBenchmark
 python datamodel_example.py
 ```
+
+### Useful Resources for Troubleshooting
+- https://github.com/openai/mujoco-py/issues/291#issuecomment-1738943394
+- https://stackoverflow.com/questions/74302629/attribute-error-randomnumbergenerator-generator-ctor-in-gym-utils-seeding
+
