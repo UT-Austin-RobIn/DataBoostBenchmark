@@ -5,3 +5,4 @@ gym==0.25.2
 tqdm
 h5py
 garage
+Cython==0.29.37

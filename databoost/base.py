@@ -57,29 +57,39 @@ class DataBoostEnvWrapper(gym.Wrapper):
         self.render_func = render_func
         self.postproc_func = postproc_func
 
-    def _get_dataset(self, dataset_dir: str, n_demos: int = None) -> AttrDict:
-        '''loads offline dataset.
-        Args:
-            dataset_dir [str]: path to dataset directory
-            n_demos [int]: number of demos from dataset to load (if None, load all)
-        Returns:
-            trajs [AttrDict]: dataset as an AttrDict
-        '''
-        if type(dataset_dir) in (list, tuple):
-            dataset_files = []
-            for cur_dataset_dir in dataset_dir:
-                dataset_files += find_h5(cur_dataset_dir)
+    # def _get_dataset(self, dataset_dir: str, n_demos: int = None) -> AttrDict:
+    #     '''loads offline dataset.
+    #     Args:
+    #         dataset_dir [str]: path to dataset directory
+    #         n_demos [int]: number of demos from dataset to load (if None, load all)
+    #     Returns:
+    #         trajs [AttrDict]: dataset as an AttrDict
+    #     '''
+    #     if type(dataset_dir) in (list, tuple):
+    #         dataset_files = []
+    #         for cur_dataset_dir in dataset_dir:
+    #             dataset_files += find_h5(cur_dataset_dir)
+    #     else:
+    #         dataset_files = find_h5(dataset_dir)
+    #     # if n_demos not specified, use all h5 files in the given dataset dir
+    #     if n_demos is None:
+    #         n_demos = len(dataset_files)
+    #     assert len(dataset_files) >= n_demos, \
+    #         f"given n_demos too large. Max is {len(dataset_files)}"
+    #     rand_idxs = random.sample(range(len(dataset_files)), n_demos)
+    #     trajs = [read_h5(dataset_files[i]) for i in rand_idxs]
+    #     trajs = concatenate_traj_data(trajs)
+    #     return trajs
+    
+    def _get_dataset(self, only_seed=False) -> AttrDict:
+        
+        if only_seed:
+            data_paths = (self.seed_dataset_url,)
         else:
-            dataset_files = find_h5(dataset_dir)
-        # if n_demos not specified, use all h5 files in the given dataset dir
-        if n_demos is None:
-            n_demos = len(dataset_files)
-        assert len(dataset_files) >= n_demos, \
-            f"given n_demos too large. Max is {len(dataset_files)}"
-        rand_idxs = random.sample(range(len(dataset_files)), n_demos)
-        trajs = [read_h5(dataset_files[i]) for i in rand_idxs]
-        trajs = concatenate_traj_data(trajs)
-        return trajs
+            data_paths = (self.seed_dataset_url, self.prior_dataset_url)
+        
+        return DataBoostDataset(data_paths, None, 1, load_imgs=False,
+                                   postproc_func=self.postproc_func, goal_condition=True)
 
     def _get_dataloader(self,
                         dataset_dir: str,
@@ -541,6 +551,8 @@ class DataBoostDataset(Dataset):
             goal_obs = traj_data["observations"][goal_max_idx].copy()[None]
             traj_seq["observations"] = np.concatenate(
                 (traj_seq["observations"], np.repeat(goal_obs, self.seq_len, axis=-2)), axis=-1)
+        
+        return (traj_seq["observations"][0].astype(np.float32), traj_seq["actions"][0].astype(np.float32), path_id)
         return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:

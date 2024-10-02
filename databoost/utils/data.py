@@ -7,7 +7,6 @@ from typing import Any, List, Dict, Tuple
 import h5py
 import numpy as np
 import torch
-import wandb
 
 from databoost.utils.general import AttrDict
 
@@ -219,10 +218,3 @@ def get_traj_slice(traj_data: Dict,
             # attributes of the trajectory that are not meant to be sliced are simply assigned to each subtrajectory
             traj_seq[attr] = copy.deepcopy([traj_data[attr] for _ in range(seq_len)])
     return traj_seq
-
-
-def dump_video_wandb(vid, tag, fps=20):
-    assert len(vid.shape) == 4 and vid.shape[1] == 3
-    if vid.max() <= 1.0:
-        vid = np.asarray(vid * 255.0, dtype=np.uint8)
-    wandb.log({tag: [wandb.Video(vid, fps=fps, format="mp4")]})
