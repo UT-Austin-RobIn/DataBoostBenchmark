@@ -336,6 +336,9 @@ class DataBoostBenchmarkBase:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         env = self.get_env(task_name)
         
+        pick_place_task_oh = np.zeros((50,))
+        pick_place_task_oh[32] = 1
+
         n_successes = 0
         gifs = [] if render else None
         for episode in tqdm(range(int(n_episodes))):
@@ -344,7 +347,7 @@ class DataBoostBenchmarkBase:
             if not goal_cond:
                 ob = env.reset()
             else:
-                test_env_dict = env.load_test_env(idx=episode)
+                test_env_dict = env.load_test_env(idx=np.random.randint(0, 100))
                 ob = test_env_dict["starting_ob"]
                 goal_ob = test_env_dict["goal_ob"]
                 # for future use; image based policies
@@ -355,6 +358,8 @@ class DataBoostBenchmarkBase:
                 with torch.no_grad():
                     if goal_cond:
                         ob = np.concatenate((ob, goal_ob), axis=-1)
+                        # ob = np.concatenate((ob, pick_place_task_oh), axis=-1)
+
                     act = policy.get_action(ob)
                 ob, rew, done, info = env.step(act)
                 if render:
@@ -375,6 +380,12 @@ class DataBoostBenchmarkBase:
         print(f"{n_successes}/{n_episodes} success rate")
         return (success_rate, gifs)
 
+def get_task_name_from_path(path):
+    splits = path.split('/')
+    task_name = splits[-1].split('_')[0]
+    if 'v2' in task_name:
+        task_name = task_name.replace('-v2', '')
+    return task_name
 
 class DataBoostDataset(Dataset):
     def __init__(self,
@@ -423,35 +434,9 @@ class DataBoostDataset(Dataset):
                 file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
-        if self.seq_len is None:
-            if n_demos is None:
-                n_demos = len(file_paths)
-            # if no seq_len is given, no need to proceed with slicing.
-            # use whole trajectories.
-            assert len(file_paths) >= n_demos, \
-                f"given n_demos too large. Max is {len(file_paths)}"
-            self.paths = random.sample(file_paths, n_demos)
 
-            self.slices = []
-            print("loading files")
-            for path_id, path in tqdm(enumerate(self.paths), total=len(self.paths)):
-                traj_data = read_h5(path, load_imgs=load_imgs)
-                if postproc_func is not None:
-                    traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
-                        postproc_func(traj_data.get("observations"), traj_data.get(
-                            "rewards"), traj_data.get("dones"), traj_data.get("infos", dict()))
-                    if "goal_observations" in traj_data:
-                        traj_data["goal_observations"], _, _, _ = \
-                            postproc_func(
-                                traj_data["goal_observations"], None, None, None)
-                traj_len = self.get_traj_len(traj_data)
-                self.path_lens[path] = traj_len
-                # [TEMP] for speed, cache everything
-                self.limited_data_cache[path] = traj_data
-                #####
-                self.slices.append((path_id, 0, traj_len))
-            print(f"Dataloader contains {len(self.slices)} slices")
-            return
+        self.ordered_task_dict = self.get_task_dict(file_paths)
+        print(self.ordered_task_dict)
 
         # filter for files that are long enough
         print("filtering files of sufficient length")
@@ -467,6 +452,10 @@ class DataBoostDataset(Dataset):
                 #     if x in path:
                 #         return True
                 # return False
+
+                # filter out target task
+                # if 'pick-place-wall' in path:
+                #     return False                    
                 return True
                                 
             if traj_len >= seq_len and filter_file(file_path):  # traj must be long enough
@@ -487,7 +476,6 @@ class DataBoostDataset(Dataset):
             n_demos = len(self.paths)
         assert len(self.paths) >= n_demos, \
             f"given n_demos too large. Max is {len(self.paths)}"
-        self.paths = random.sample(self.paths, n_demos)
 
         self.slices = []
         if self.goal_condition and "goal_observations" not in traj_data:
@@ -511,6 +499,17 @@ class DataBoostDataset(Dataset):
                     max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
                 self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
+
+    def get_task_dict(self, paths):
+        tasks = set({})
+        for path in paths:
+            task_name = get_task_name_from_path(path)
+            tasks.add(task_name)
+        
+        tasks = sorted(list(tasks))
+
+        task_dict = {t: i for i, t in enumerate(tasks)}
+        return task_dict
 
     def __len__(self) -> int:
         '''returns length of the dataset; number of traj slices associated with
@@ -549,9 +548,12 @@ class DataBoostDataset(Dataset):
         if self.goal_condition and "goal_observations" not in traj_data:
             _, goal_max_idx = self.pretrain_goals[idx]
             goal_obs = traj_data["observations"][goal_max_idx].copy()[None]
-            traj_seq["observations"] = np.concatenate(
-                (traj_seq["observations"], np.repeat(goal_obs, self.seq_len, axis=-2)), axis=-1)
-        
+            traj_seq["observations"] = np.concatenate((traj_seq["observations"], np.repeat(goal_obs, self.seq_len, axis=-2)), axis=-1)
+
+            # task_id = self.ordered_task_dict[get_task_name_from_path(self.paths[path_id])]
+            # task_onehot = np.zeros((1, len(self.ordered_task_dict)))
+            # task_onehot[0, task_id] = 1
+            # traj_seq["observations"] = np.concatenate((traj_seq["observations"], np.repeat(task_onehot, self.seq_len, axis=-2)), axis=-1)
         return (traj_seq["observations"][0].astype(np.float32), traj_seq["actions"][0].astype(np.float32), path_id)
         return traj_seq
 

@@ -28,8 +28,7 @@ def train(policy: nn.Module,
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     policy = policy.train().to(device)
-    optimizer = optim.Adam(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
-    best_success_rate = 0
+    optimizer = optim.AdamW(policy.parameters(), lr=1e-4, betas=(0.9, 0.999))
 
     step = 0
     epoch = 0
@@ -82,14 +81,11 @@ def train(policy: nn.Module,
     return policy
 
 if __name__ == "__main__":
-    benchmark_name = "metaworld"
     task_name = "pick-place-wall"
-    experiment_method = "R3M"
-    policy_class = TanhGaussianBCPolicy
     goal_condition = True
 
     # initialize environment
-    benchmark = databoost.get_benchmark(benchmark_name=benchmark_name)
+    benchmark = databoost.get_benchmark(benchmark_name='metaworld')
     env = benchmark.get_env(task_name)
 
     # testing if environment is working
@@ -98,52 +94,87 @@ if __name__ == "__main__":
     #     obs, reward, done, info = env.step(env.action_space.sample())  
     #     cv2.imshow('x', env.default_render())
     #     cv2.waitKey(1)
-    if True:
-        # data loader
-        dataloader_configs = {
-            "batch_size": 500,
-            "seq_len": 1,
-            "shuffle": True,
-            "load_imgs": False,
-            "goal_condition": goal_condition
-        }
-        dataloader = env.get_combined_dataloader(**dataloader_configs)
+    
+    # data loader
+    # dataloader_configs = {
+    #     "batch_size": 1000,
+    #     "seq_len": 1,
+    #     "shuffle": True,
+    #     "load_imgs": False,
+    #     "goal_condition": goal_condition
+    # }
+    # dataloader = env.get_combined_dataloader(**dataloader_configs)
 
-        # create policy
-        policy_configs = {
-            "obs_dim": 39 * (2 if goal_condition else 1),
-            "act_dim": 4,
-            "hidden_sizes": [400, 400, 400], # [100, 100, 100]
-            "hidden_nonlinearity": nn.ReLU,
-            "output_nonlinearity": None,
-            "min_std": np.exp(-20.),
-            "max_std": np.exp(2.)
-        }
+    from ffcv.loader import Loader, OrderOption
+    from ffcv.fields.decoders import NDArrayDecoder
+    from ffcv.transforms import ToTensor, ToDevice
+    pipelines={
+        'observations': [NDArrayDecoder(), ToTensor(), ToDevice(torch.device('cuda'))],
+        'actions': [NDArrayDecoder(), ToTensor(), ToDevice(torch.device('cuda'))],
+    }
 
-        # training policy
-        train_configs = {
-            "exp_name": None,
-            "task_name": task_name,
-            "dest_dir": None,
-            "eval_period": 5e3,
-            "eval_episodes": 20,
-            "eval_max_traj_len": 500,
-            "chkpt_save_period": 5e3,
-            "n_steps": 1e5,
-            "goal_condition": goal_condition
-        }
+    
+    # create policy
+    policy_configs = {
+        "obs_dim": 78, # 78
+        "act_dim": 4,
+        "hidden_sizes": [400, 400, 400], # [100, 100, 100]
+        "hidden_nonlinearity": nn.ReLU,
+        "output_nonlinearity": None,
+        "min_std": np.exp(-20.),
+        "max_std": np.exp(2.)
+    }
 
-        for i in range(3):
-            train_configs["exp_name"] = f"no_curation_{i}"
-            policy = policy_class(**policy_configs)
-            policy = train(policy=policy,
-                        dataloader=dataloader,
-                        benchmark=benchmark,
-                        **train_configs)
+    # training policy
+    train_configs = {
+        "exp_name": None,
+        "task_name": task_name,
+        "dest_dir": None,
+        "eval_period": 2e4,
+        "eval_episodes": 50,
+        "eval_max_traj_len": 500,
+        "chkpt_save_period": 5e3,
+        "n_steps": 2e5,
+        "goal_condition": goal_condition
+    }
 
-        exit(0)
+    dataloader = Loader(
+        # fname='/home/shivin/Desktop/datamodels/data/metaworld/ffcv_training_data/metaworld_train.beton',
+        # fname='/home/shivin/Desktop/datamodels/data/metaworld/ffcv_training_data/hand-curated.beton',
+        fname='/home/shivin/Desktop/datamodels/data/metaworld/ffcv_training_data/hand-curated_wo_pick-place-wall.beton',
+        batch_size=1000,
+        num_workers=5,
+        order=OrderOption.QUASI_RANDOM,
+        pipelines=pipelines,
+        # indices=indices,
+        drop_last=True
+    )
 
+    # for layers in [2, 3]:
+    #     for hidden_size in [100, 200, 400]:
+    #         for i in range(3):
+    #             policy_configs["hidden_sizes"] = [hidden_size] * layers
+    #             train_configs["exp_name"] = f"hand_curated_{layers}layers_{hidden_size}hidden_{i}"
+    #             policy = TanhGaussianBCPolicy(**policy_configs)
+    #             policy = train(policy=policy,
+    #                         dataloader=dataloader,
+    #                         benchmark=benchmark,
+    #                         **train_configs)
 
+    for i in range(3):    
+        train_configs["exp_name"] = f"hand-curated_wo_pick-place-wall_{i}"
+        policy = TanhGaussianBCPolicy(**policy_configs)
+        policy = train(policy=policy,
+                    dataloader=dataloader,
+                    benchmark=benchmark,
+                    **train_configs)
+            
+    # train_configs["exp_name"] = f"no_curation"
+    # policy = TanhGaussianBCPolicy(**policy_configs)
+    # policy = train(policy=policy,
+    #             dataloader=dataloader,
+    #             benchmark=benchmark,
+    #             **train_configs)
 
 
     # # loading and evaluating a policy
