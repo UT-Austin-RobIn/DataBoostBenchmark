@@ -4,6 +4,7 @@ __pycache__/
 # Data / Plots / Figures
 *.avi
 *.h5
+*.npy
 
 # Trained models
 *.pt

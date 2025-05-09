@@ -81,15 +81,23 @@ class DataBoostEnvWrapper(gym.Wrapper):
     #     trajs = concatenate_traj_data(trajs)
     #     return trajs
     
-    def _get_dataset(self, only_seed=False) -> AttrDict:
+    def _get_dataset(self, only_seed=False, goal_condition=True, seq_len=1, stride=1, extra_path=None, **kwargs) -> AttrDict:
         
         if only_seed:
             data_paths = (self.seed_dataset_url,)
         else:
             data_paths = (self.seed_dataset_url, self.prior_dataset_url)
         
-        return DataBoostDataset(data_paths, None, 1, load_imgs=False,
-                                   postproc_func=self.postproc_func, goal_condition=True)
+        return DataBoostDataset(
+                dataset_dir=data_paths, 
+                n_demos=None, 
+                seq_len=seq_len,
+                stride=stride,
+                load_imgs=False,
+                postproc_func=self.postproc_func,
+                goal_condition=goal_condition,
+                extra_path=extra_path, 
+                **kwargs)
 
     def _get_dataloader(self,
                         dataset_dir: str,
@@ -392,9 +400,12 @@ class DataBoostDataset(Dataset):
                  dataset_dir: str,
                  n_demos: int = None,
                  seq_len: int = None,
+                 stride: int = 1,
                  load_imgs: bool = True,
                  postproc_func: Callable = None,
-                 goal_condition: bool = False):
+                 goal_condition: bool = False,
+                 extra_path=None,
+                 pad_short_traj=False):
         '''DataBoostDataset is a pytorch Dataset class for loading h5-based
         offline trajectory data from a given directory of h5 files.
         Will return AttrDict object where each attribute is of shape:
@@ -424,9 +435,11 @@ class DataBoostDataset(Dataset):
         self.limited_data_cache = {}
         self.dataset_dir = dataset_dir
         self.seq_len = seq_len
+        self.stride = stride
         self.goal_condition = goal_condition
         self.paths = []
         self.path_lens = {}
+        self.old_path_lens = {}
 
         if type(dataset_dir) in (list, tuple):
             file_paths = []
@@ -434,6 +447,15 @@ class DataBoostDataset(Dataset):
                 file_paths += find_h5(cur_dataset_dir)
         else:
             file_paths = find_h5(dataset_dir)
+
+        apply_filter = {k: True for k in file_paths}
+
+        if extra_path:
+            for path in extra_path:
+                h5_paths = find_h5(path)
+                for k in h5_paths:
+                    apply_filter[k] = False
+                file_paths.extend(h5_paths)
 
         self.ordered_task_dict = self.get_task_dict(file_paths)
         print(self.ordered_task_dict)
@@ -455,10 +477,15 @@ class DataBoostDataset(Dataset):
 
                 # filter out target task
                 # if 'pick-place-wall' in path:
-                #     return False                    
+                #     return False
                 return True
-                                
-            if traj_len >= seq_len and filter_file(file_path):  # traj must be long enough
+            
+            old_traj_len = traj_len
+            if pad_short_traj and traj_len < seq_len:
+                traj_data = self.pad_with_zeros(traj_data, seq_len-traj_len)
+            traj_len = self.get_traj_len(traj_data)
+
+            if traj_len >= seq_len and ((not apply_filter[file_path]) or filter_file(file_path)):  # traj must be long enough
                 if postproc_func is not None:
                     traj_data["observations"], traj_data["rewards"], traj_data["dones"], traj_data["infos"] = \
                         postproc_func(traj_data.get("observations"), traj_data.get(
@@ -470,20 +497,20 @@ class DataBoostDataset(Dataset):
                 self.limited_data_cache[file_path] = traj_data
                 #####
                 self.path_lens[file_path] = traj_len
-        print(f"{len(self.paths)}/{len(file_paths)} trajectories "
-              "are of sufficient length")
+                self.old_path_lens[file_path] = old_traj_len
+
+                
+        print(f"{len(self.paths)}/{len(file_paths)} trajectories are of sufficient length")
         if n_demos is None:
             n_demos = len(self.paths)
-        assert len(self.paths) >= n_demos, \
-            f"given n_demos too large. Max is {len(self.paths)}"
+        assert len(self.paths) >= n_demos, f"given n_demos too large. Max is {len(self.paths)}"
 
         self.slices = []
-        if self.goal_condition and "goal_observations" not in traj_data:
-            self.pretrain_goals = []
-
+        self.pretrain_goals = []
         for path_id, path in enumerate(self.paths):
             traj_len = self.path_lens[path]
-            start_end_idxs = get_start_end_idxs(traj_len, self.seq_len)
+            old_traj_len = self.old_path_lens[path]
+            start_end_idxs = get_start_end_idxs(traj_len, window=self.seq_len, stride=self.stride)
             traj_slices = [(path_id, *start_end_idx)
                            for start_end_idx in start_end_idxs]
             self.slices += traj_slices
@@ -493,12 +520,18 @@ class DataBoostDataset(Dataset):
             # We use 200 (GOAL_DIST) as the default, with a random window of 10
             # (GOAL_WINDOW).
             if self.goal_condition and "goal_observations" not in traj_data:
-                max_goal_idxs = [
-                    min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
-                min_goal_idxs = [
-                    max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
+                max_goal_idxs = [old_traj_len-1]*len(start_end_idxs)
+                #     min(traj_len - 1, start_end_idx[-1] + GOAL_DIST) for start_end_idx in start_end_idxs]
+                min_goal_idxs = [-1]*len(start_end_idxs)
+                #     max(max_goal_idx - GOAL_WINDOW, start_end_idx[-1]) for start_end_idx, max_goal_idx in zip(start_end_idxs, max_goal_idxs)]
                 self.pretrain_goals += list(zip(min_goal_idxs, max_goal_idxs))
         print(f"Dataloader contains {len(self.slices)} slices")
+
+        self.task_indices = []
+        for idx in range(len(self)):
+            path_id, _, _ = self.slices[idx]
+            self.task_indices.append(path_id)
+        self.task_indices = np.array(self.task_indices)
 
     def get_task_dict(self, paths):
         tasks = set({})
@@ -510,6 +543,14 @@ class DataBoostDataset(Dataset):
 
         task_dict = {t: i for i, t in enumerate(tasks)}
         return task_dict
+
+    def pad_with_zeros(self, traj_data, pad_len):
+        for k in traj_data.keys():
+            if not isinstance(traj_data[k], np.ndarray):
+                continue
+            pad_widths = ((0, pad_len),) if len(traj_data[k].shape) == 1 else ((0, pad_len), (0, 0))
+            traj_data[k] = np.pad(traj_data[k], pad_widths)
+        return traj_data
 
     def __len__(self) -> int:
         '''returns length of the dataset; number of traj slices associated with
@@ -534,12 +575,14 @@ class DataBoostDataset(Dataset):
         if self.paths[path_id] in self.limited_data_cache:
             traj_data = self.limited_data_cache[self.paths[path_id]]
         else:
-            traj_data = read_h5(self.paths[path_id])
-            if len(self.limited_data_cache) > LTD_CACHE_MAX:
-                self.limited_data_cache.pop(
-                    list(self.limited_data_cache.keys())[0])
-                raise ValueError
-            self.limited_data_cache[path_id] = traj_data
+            assert 1==0, "Trajectory cannot be located"
+        #     print("MISS")
+        #     traj_data = read_h5(self.paths[path_id])
+            # if len(self.limited_data_cache) > LTD_CACHE_MAX:
+            #     self.limited_data_cache.pop(
+            #         list(self.limited_data_cache.keys())[0])
+            #     raise ValueError
+            # self.limited_data_cache[path_id] = traj_data
         if self.seq_len is None:
             return traj_data
         traj_len = self.path_lens[self.paths[path_id]]
@@ -554,8 +597,9 @@ class DataBoostDataset(Dataset):
             # task_onehot = np.zeros((1, len(self.ordered_task_dict)))
             # task_onehot[0, task_id] = 1
             # traj_seq["observations"] = np.concatenate((traj_seq["observations"], np.repeat(task_onehot, self.seq_len, axis=-2)), axis=-1)
-        return (traj_seq["observations"][0].astype(np.float32), traj_seq["actions"][0].astype(np.float32), path_id)
-        return traj_seq
+        
+        return (traj_seq["observations"].reshape(-1).astype(np.float32), traj_seq["actions"].reshape(-1).astype(np.float32),)
+        # return traj_seq
 
     def get_traj_len(self, traj_data: Dict) -> int:
         '''Get length of trajectory given the dictionary of trajectory data

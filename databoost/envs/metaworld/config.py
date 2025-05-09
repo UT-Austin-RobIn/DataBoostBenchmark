@@ -323,10 +323,10 @@ seed_tasks_list = [
 ]
 seed_dataset_dir = os.path.join(env_root, "data/seed")
 seed_n_demos = 5
-seed_do_render = True
+seed_do_render = False
 seed_save_env_and_goal = False
 seed_dataset_kwargs = AttrDict({
-    "act_noise_pct": 0.1,
+    "act_noise_pct": 0.0,
     "resolution": (224, 224),
     "camera": "corner"
 })

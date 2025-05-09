@@ -84,12 +84,12 @@ if __name__ == "__main__":
             if task_name in cfg.seed_tasks_list
         },
         dest_dir=cfg.seed_dataset_dir,
-        n_demos_per_task=cfg.seed_n_demos,
+        n_demos_per_task=10,#cfg.seed_n_demos,
         do_render=cfg.seed_do_render,
         save_env_and_goal=cfg.seed_save_env_and_goal,
         mask_reward=False
     )
-
+    exit(0)
     '''generate prior dataset'''
     prior_dataset_generator = DatasetGeneratorMetaworld(
         **cfg.prior_dataset_kwargs)
